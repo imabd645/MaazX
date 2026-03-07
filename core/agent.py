@@ -69,7 +69,7 @@ class Agent:
 
     def repl(self):
         """Interactive read-eval-print loop."""
-        print("\n🤖 Coding Agent ready!  Type 'exit' to quit.")
+        print("\n[Agent] Coding Agent ready!  Type 'exit' to quit.")
         print("   I can scan codebases, search files, run commands, and edit code.\n")
 
         while True:

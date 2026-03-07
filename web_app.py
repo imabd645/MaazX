@@ -3,6 +3,7 @@ Web UI for the Gemini Coding Agent.
 Run:  python web_app.py
 """
 
+import os
 from flask import Flask, render_template, request, jsonify
 import google.generativeai as genai
 from google.generativeai.types import content_types
@@ -30,6 +31,9 @@ tool_cfg = content_types.to_tool_config(
 
 chat = model.start_chat(enable_automatic_function_calling=True)
 
+# Current working directory for the agent (default: where the script runs)
+current_working_dir = os.getcwd()
+
 
 # ── Routes ──────────────────────────────────────────────────
 @app.route("/")
@@ -39,13 +43,21 @@ def index():
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
+    global current_working_dir
     data = request.get_json()
     user_msg = data.get("message", "").strip()
     if not user_msg:
         return jsonify({"error": "Empty message"}), 400
 
+    # Prepend the current working directory context so the model knows where to operate
+    context_msg = (
+        f"[Current working directory: {current_working_dir}]\n"
+        f"All relative file paths should be resolved relative to this directory.\n\n"
+        f"{user_msg}"
+    )
+
     try:
-        response = chat.send_message(user_msg, tool_config=tool_cfg)
+        response = chat.send_message(context_msg, tool_config=tool_cfg)
 
         # Try to get text reply
         reply_text = None
@@ -70,7 +82,7 @@ def api_chat():
 
         # Collect tool calls that were made (for showing in the UI)
         tool_calls = []
-        for content in chat.history[-6:]:  # look at recent history
+        for content in chat.history[-6:]:
             for part in content.parts:
                 fn_call = getattr(part, "function_call", None)
                 if fn_call:
@@ -81,7 +93,7 @@ def api_chat():
 
         return jsonify({
             "reply": reply_text or "Done.",
-            "tool_calls": tool_calls[-5:],  # last 5 tool calls
+            "tool_calls": tool_calls[-5:],
         })
 
     except Exception as e:
@@ -95,6 +107,62 @@ def api_reset():
     return jsonify({"status": "ok"})
 
 
+@app.route("/api/cwd", methods=["GET"])
+def api_get_cwd():
+    """Return the current working directory."""
+    return jsonify({"cwd": current_working_dir})
+
+
+@app.route("/api/cwd", methods=["POST"])
+def api_set_cwd():
+    """Set a new working directory."""
+    global current_working_dir
+    data = request.get_json()
+    new_dir = data.get("cwd", "").strip()
+
+    if not new_dir:
+        return jsonify({"error": "Empty directory path"}), 400
+    if not os.path.isdir(new_dir):
+        return jsonify({"error": f"'{new_dir}' is not a valid directory"}), 400
+
+    current_working_dir = os.path.abspath(new_dir)
+    return jsonify({"cwd": current_working_dir})
+
+
+@app.route("/api/browse", methods=["POST"])
+def api_browse():
+    """List subdirectories of a given path for the directory picker."""
+    data = request.get_json()
+    path = data.get("path", "").strip()
+
+    # Default to drives on Windows, root on Linux
+    if not path:
+        if os.name == "nt":
+            import string
+            drives = []
+            for letter in string.ascii_uppercase:
+                drive = f"{letter}:\\"
+                if os.path.exists(drive):
+                    drives.append(drive)
+            return jsonify({"parent": "", "dirs": drives})
+        else:
+            path = "/"
+
+    if not os.path.isdir(path):
+        return jsonify({"error": f"'{path}' is not a valid directory"}), 400
+
+    try:
+        entries = []
+        for entry in sorted(os.listdir(path)):
+            full = os.path.join(path, entry)
+            if os.path.isdir(full) and not entry.startswith('.'):
+                entries.append(full)
+        parent = os.path.dirname(os.path.abspath(path))
+        return jsonify({"parent": parent, "dirs": entries})
+    except PermissionError:
+        return jsonify({"error": "Permission denied"}), 403
+
+
 if __name__ == "__main__":
-    print("\n🚀 Agent Web UI starting at http://localhost:5000\n")
+    print("\n>>> Agent Web UI starting at http://localhost:5000\n")
     app.run(debug=False, port=5000)
