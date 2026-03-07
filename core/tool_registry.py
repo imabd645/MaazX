@@ -21,3 +21,11 @@ def register_tool(func):
 def get_all_tools() -> list:
     """Return every registered tool function."""
     return list(_registry)
+
+
+def get_tool_by_name(name: str):
+    """Look up a registered tool by function name."""
+    for fn in _registry:
+        if fn.__name__ == name:
+            return fn
+    return None

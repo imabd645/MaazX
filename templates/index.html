@@ -144,12 +144,23 @@
             <div class="setting-group">
                 <label class="setting-label">Model</label>
                 <select class="setting-select" id="setting-model">
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                    <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                    <optgroup label="Gemini (Google AI)">
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
+                    </optgroup>
+                    <optgroup label="OpenRouter">
+                        <option value="gemma-3-27b">Gemma 3 27B</option>
+                    </optgroup>
                 </select>
                 <span class="setting-hint">Changing model resets the chat session</span>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">OpenRouter API Key</label>
+                <input type="password" class="setting-input" id="setting-openrouter-key" placeholder="sk-or-...">
+                <span class="setting-hint">Required for Gemma and other OpenRouter models</span>
             </div>
 
             <div class="setting-group">
