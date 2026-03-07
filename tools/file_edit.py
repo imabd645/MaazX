@@ -2,7 +2,7 @@
 
 import os
 from core.tool_registry import register_tool
-
+from core import git_backup
 
 @register_tool
 def edit_file(filepath: str, target_content: str, replacement_content: str) -> str:
@@ -23,11 +23,16 @@ def edit_file(filepath: str, target_content: str, replacement_content: str) -> s
         if target_content not in content:
             return f"Error: target_content not found in '{filepath}'"
 
+        git_backup.backup_before_edit(filepath)
+
         new_content = content.replace(target_content, replacement_content, 1)
 
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(new_content)
+            
+        git_backup.commit_after_edit(filepath, "edit_file")
 
         return f"Successfully edited file '{filepath}'"
     except Exception as e:
         return f"Error editing file '{filepath}': {e}"
+

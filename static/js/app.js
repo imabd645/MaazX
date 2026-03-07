@@ -128,16 +128,29 @@ function appendMessage(role, text, toolCalls = []) {
     const nameText = isUser ? 'You' : 'Agent';
 
     let toolBadgesHtml = '';
+    let hasEditingTool = false;
+
     if (toolCalls.length > 0) {
-        const badges = toolCalls.map(tc =>
-            `<span class="tool-badge">
+        const badges = toolCalls.map(tc => {
+            if (['create_file', 'edit_file', 'patch_file', 'run_command'].includes(tc.name)) {
+                hasEditingTool = true;
+            }
+            return `<span class="tool-badge">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="20 6 9 17 4 12"/>
                 </svg>
                 ${escapeHtml(tc.name)}
-            </span>`
-        ).join('');
-        toolBadgesHtml = `<div class="tool-calls">${badges}</div>`;
+            </span>`;
+        }).join('');
+
+        let undoBtnHtml = '';
+        if (hasEditingTool && role === 'assistant') {
+            undoBtnHtml = `<button class="undo-btn" onclick="undoLastAction(this)">
+                <i>↶</i> Undo Action
+            </button>`;
+        }
+
+        toolBadgesHtml = `<div class="tool-calls">${badges}${undoBtnHtml}</div>`;
     }
 
     const renderedBody = isUser ? escapeHtml(text) : renderMarkdown(text);
@@ -153,6 +166,36 @@ function appendMessage(role, text, toolCalls = []) {
 
     messagesDiv.appendChild(div);
     scrollToBottom();
+}
+
+async function undoLastAction(btn) {
+    if (!confirm("Revert the last agent tool action? This will undo the most recent file change and restore your previous work state.")) {
+        return;
+    }
+
+    btn.disabled = true;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = `<i>⏳</i> Undoing...`;
+
+    try {
+        const res = await fetch('/api/undo', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            btn.innerHTML = `<i>✓</i> Undone`;
+            btn.style.color = "var(--green)";
+            btn.style.background = "rgba(16, 185, 129, 0.1)";
+            btn.style.borderColor = "var(--green)";
+            alert(data.message);
+        } else {
+            btn.innerHTML = `<i>❌</i> Failed`;
+            alert("Undo failed: " + data.message);
+        }
+    } catch (e) {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        alert("Network error calling undo.");
+    }
 }
 
 function showThinking() {
@@ -562,5 +605,47 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         }
     } catch (err) {
         alert('Error saving settings: ' + err.message);
+    }
+});
+
+
+let indexingInterval = null;
+
+document.getElementById('btn-index-codebase').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-index-codebase');
+    const statusText = document.getElementById('indexing-status-text');
+
+    btn.disabled = true;
+    statusText.textContent = "Starting indexer...";
+
+    try {
+        await fetch('/api/index_codebase', { method: 'POST' });
+
+        if (indexingInterval) clearInterval(indexingInterval);
+
+        indexingInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/api/indexing_status');
+                const data = await res.json();
+
+                if (data.status === 'indexing') {
+                    statusText.textContent = `Indexing... ${data.progress}%`;
+                } else if (data.status === 'idle') {
+                    clearInterval(indexingInterval);
+                    statusText.textContent = "Indexing complete! Semantic search ready.";
+                    btn.disabled = false;
+                } else if (data.status.startsWith('error')) {
+                    clearInterval(indexingInterval);
+                    statusText.textContent = `Failed: ${data.status}`;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }, 1000);
+
+    } catch (err) {
+        statusText.textContent = "Error triggering indexing.";
+        btn.disabled = false;
     }
 });

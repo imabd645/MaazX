@@ -81,6 +81,35 @@ body {
     background: var(--border-light);
 }
 
+/* ── UI Buttons / Undo ──────────────────────────────────── */
+.undo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(239, 68, 68, 0.1);
+    /* light red */
+    color: #ef4444;
+    /* red-500 */
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 10px;
+}
+
+.undo-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.undo-btn i {
+    font-size: 12px;
+}
+
+
 /* ── Sidebar ────────────────────────────────────────────── */
 .sidebar {
     width: var(--sidebar-width);
