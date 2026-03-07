@@ -1,11 +1,11 @@
 /* ── Gemini Agent – Frontend Logic ───────────────────────── */
 
-const chatArea    = document.getElementById('chat-area');
+const chatArea = document.getElementById('chat-area');
 const messagesDiv = document.getElementById('messages');
-const welcome     = document.getElementById('welcome');
-const input       = document.getElementById('message-input');
-const sendBtn     = document.getElementById('send-btn');
-const statusDot   = document.getElementById('status-dot');
+const welcome = document.getElementById('welcome');
+const input = document.getElementById('message-input');
+const sendBtn = document.getElementById('send-btn');
+const statusDot = document.getElementById('status-dot');
 
 let isProcessing = false;
 
@@ -79,12 +79,10 @@ async function sendMessage() {
     sendBtn.disabled = true;
     welcome.classList.add('hidden');
 
-    // Add user message
     appendMessage('user', text);
     input.value = '';
     input.style.height = 'auto';
 
-    // Show thinking indicator
     const thinkingEl = showThinking();
     setStatus('thinking');
 
@@ -99,13 +97,13 @@ async function sendMessage() {
         removeThinking(thinkingEl);
 
         if (data.error) {
-            appendMessage('assistant', `⚠️ Error: ${data.error}`, []);
+            appendMessage('assistant', 'Error: ' + data.error, []);
         } else {
             appendMessage('assistant', data.reply, data.tool_calls || []);
         }
     } catch (err) {
         removeThinking(thinkingEl);
-        appendMessage('assistant', `⚠️ Network error: ${err.message}`, []);
+        appendMessage('assistant', 'Network error: ' + err.message, []);
     }
 
     setStatus('ready');
@@ -121,9 +119,9 @@ function appendMessage(role, text, toolCalls = []) {
 
     const isUser = role === 'user';
     const avatarClass = isUser ? 'user-av' : 'agent-av';
-    const nameClass   = isUser ? 'user-name' : 'agent-name';
-    const avatarText  = isUser ? 'U' : '⚡';
-    const nameText    = isUser ? 'You' : 'Agent';
+    const nameClass = isUser ? 'user-name' : 'agent-name';
+    const avatarText = isUser ? 'U' : 'A';
+    const nameText = isUser ? 'You' : 'Agent';
 
     let toolBadgesHtml = '';
     if (toolCalls.length > 0) {
@@ -158,7 +156,7 @@ function showThinking() {
     div.className = 'thinking';
     div.innerHTML = `
         <div class="msg-header">
-            <div class="msg-avatar agent-av">⚡</div>
+            <div class="msg-avatar agent-av">A</div>
             <span class="msg-name agent-name">Agent</span>
         </div>
         <div class="thinking-dots">
@@ -180,7 +178,7 @@ function scrollToBottom() {
 
 function setStatus(state) {
     statusDot.style.background = state === 'thinking' ? 'var(--orange)' : 'var(--green)';
-    statusDot.style.boxShadow  = state === 'thinking' ? '0 0 6px var(--orange)' : '0 0 6px var(--green)';
+    statusDot.style.boxShadow = state === 'thinking' ? '0 0 6px var(--orange)' : '0 0 6px var(--green)';
 }
 
 function renderMarkdown(text) {
@@ -195,4 +193,166 @@ function escapeHtml(str) {
     const el = document.createElement('span');
     el.textContent = str;
     return el.innerHTML;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   Working Directory Picker
+   ═══════════════════════════════════════════════════════════ */
+
+const cwdDisplay = document.getElementById('cwd-display');
+const cwdPathEl = document.getElementById('cwd-path');
+const dirModal = document.getElementById('dir-modal');
+const dirInput = document.getElementById('dir-input');
+const dirSetBtn = document.getElementById('dir-set-btn');
+const dirList = document.getElementById('dir-list');
+const dirBreadcrumb = document.getElementById('dir-breadcrumb');
+const modalClose = document.getElementById('modal-close');
+
+/* Fetch & display current working directory on load */
+(async function loadCwd() {
+    try {
+        const res = await fetch('/api/cwd');
+        const data = await res.json();
+        cwdPathEl.textContent = data.cwd;
+        dirInput.value = data.cwd;
+    } catch { /* ignore */ }
+})();
+
+/* Open modal */
+cwdDisplay.addEventListener('click', () => {
+    dirModal.style.display = 'flex';
+    browseTo(dirInput.value || '');
+});
+
+/* Close modal */
+modalClose.addEventListener('click', closeModal);
+dirModal.addEventListener('click', (e) => {
+    if (e.target === dirModal) closeModal();
+});
+
+function closeModal() {
+    dirModal.style.display = 'none';
+}
+
+/* Set directory from text input */
+dirSetBtn.addEventListener('click', () => setCwd(dirInput.value.trim()));
+dirInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') setCwd(dirInput.value.trim());
+});
+
+async function setCwd(path) {
+    if (!path) return;
+    try {
+        const res = await fetch('/api/cwd', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cwd: path }),
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        cwdPathEl.textContent = data.cwd;
+        dirInput.value = data.cwd;
+        closeModal();
+    } catch (err) {
+        alert('Error setting directory: ' + err.message);
+    }
+}
+
+/* Browse directories */
+async function browseTo(path) {
+    dirList.innerHTML = '<div class="dir-loading">Loading...</div>';
+    try {
+        const res = await fetch('/api/browse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path }),
+        });
+        const data = await res.json();
+        if (data.error) {
+            dirList.innerHTML = `<div class="dir-loading">${escapeHtml(data.error)}</div>`;
+            return;
+        }
+
+        // Update breadcrumb
+        renderBreadcrumb(path);
+
+        // Update input
+        if (path) dirInput.value = path;
+
+        // Render folder list
+        if (data.dirs.length === 0) {
+            dirList.innerHTML = '<div class="dir-loading">No subdirectories found</div>';
+            return;
+        }
+
+        dirList.innerHTML = '';
+        data.dirs.forEach(dir => {
+            const name = dir.split(/[/\\]/).filter(Boolean).pop() || dir;
+            const item = document.createElement('button');
+            item.className = 'dir-item';
+            item.innerHTML = `
+                <span class="dir-item-icon">&#128193;</span>
+                <span>${escapeHtml(name)}</span>
+                <span class="dir-item-select" data-path="${escapeHtml(dir)}">Select</span>
+            `;
+            // Click folder name => browse into it
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('dir-item-select')) {
+                    // Select button clicked — set as CWD
+                    setCwd(dir);
+                } else {
+                    // Navigate into the folder
+                    browseTo(dir);
+                }
+            });
+            dirList.appendChild(item);
+        });
+
+    } catch (err) {
+        dirList.innerHTML = `<div class="dir-loading">Error: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+function renderBreadcrumb(path) {
+    dirBreadcrumb.innerHTML = '';
+    if (!path) {
+        // Show root / drives label
+        const span = document.createElement('span');
+        span.className = 'dir-crumb';
+        span.textContent = 'Drives';
+        span.addEventListener('click', () => browseTo(''));
+        dirBreadcrumb.appendChild(span);
+        return;
+    }
+
+    // Split path into segments
+    const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
+    let accumulated = '';
+
+    // Root button
+    const rootBtn = document.createElement('button');
+    rootBtn.className = 'dir-crumb';
+    rootBtn.textContent = 'Drives';
+    rootBtn.addEventListener('click', () => browseTo(''));
+    dirBreadcrumb.appendChild(rootBtn);
+
+    parts.forEach((part, i) => {
+        accumulated += part + '/';
+        const currentPath = accumulated;
+
+        const sep = document.createElement('span');
+        sep.className = 'dir-sep';
+        sep.textContent = ' / ';
+        dirBreadcrumb.appendChild(sep);
+
+        const btn = document.createElement('button');
+        btn.className = 'dir-crumb';
+        btn.textContent = part;
+        btn.addEventListener('click', () => browseTo(currentPath));
+        dirBreadcrumb.appendChild(btn);
+    });
 }
