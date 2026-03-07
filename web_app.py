@@ -161,6 +161,74 @@ def api_browse():
     except PermissionError:
         return jsonify({"error": "Permission denied"}), 403
 
+import subprocess
+
+# Shared terminal history so agent's run_command calls also show up in the UI terminal
+terminal_history = []
+
+
+@app.route("/api/terminal", methods=["POST"])
+def api_terminal():
+    """Run a command from the UI terminal."""
+    global current_working_dir
+    data = request.get_json()
+    command = data.get("command", "").strip()
+    if not command:
+        return jsonify({"error": "Empty command"}), 400
+
+    # Handle 'cd' specially — update the working directory
+    if command.strip().startswith("cd "):
+        new_dir = command.strip()[3:].strip().strip('"').strip("'")
+        target = os.path.abspath(os.path.join(current_working_dir, new_dir))
+        if os.path.isdir(target):
+            current_working_dir = target
+            entry = {"command": command, "output": f"Changed directory to {target}", "exit_code": 0, "cwd": current_working_dir}
+            terminal_history.append(entry)
+            return jsonify(entry)
+        else:
+            entry = {"command": command, "output": f"cd: no such directory: {new_dir}", "exit_code": 1, "cwd": current_working_dir}
+            terminal_history.append(entry)
+            return jsonify(entry)
+
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=current_working_dir,
+        )
+        output = ""
+        if result.stdout:
+            output += result.stdout
+        if result.stderr:
+            output += result.stderr
+
+        entry = {
+            "command": command,
+            "output": output.strip() or "(no output)",
+            "exit_code": result.returncode,
+            "cwd": current_working_dir,
+        }
+        terminal_history.append(entry)
+        return jsonify(entry)
+
+    except subprocess.TimeoutExpired:
+        entry = {"command": command, "output": "Command timed out after 60 seconds.", "exit_code": -1, "cwd": current_working_dir}
+        terminal_history.append(entry)
+        return jsonify(entry)
+    except Exception as e:
+        entry = {"command": command, "output": str(e), "exit_code": -1, "cwd": current_working_dir}
+        terminal_history.append(entry)
+        return jsonify(entry)
+
+
+@app.route("/api/terminal/history", methods=["GET"])
+def api_terminal_history():
+    """Return recent terminal history (last 50 entries)."""
+    return jsonify({"history": terminal_history[-50:], "cwd": current_working_dir})
+
 
 if __name__ == "__main__":
     print("\n>>> Agent Web UI starting at http://localhost:5000\n")

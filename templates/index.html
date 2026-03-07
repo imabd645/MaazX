@@ -154,6 +154,15 @@
                 <span class="model-badge">Gemini 2.5 Flash</span>
                 <span class="status-dot" id="status-dot"></span>
             </div>
+            <div class="topbar-right">
+                <button class="terminal-toggle" id="terminal-toggle" title="Toggle Terminal">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="4 17 10 11 4 5" />
+                        <line x1="12" y1="19" x2="20" y2="19" />
+                    </svg>
+                    Terminal
+                </button>
+            </div>
         </header>
 
         <div class="chat-area" id="chat-area">
@@ -193,6 +202,29 @@
                 </button>
             </div>
             <div class="input-hint">Gemini Agent can make mistakes. Verify important file operations.</div>
+        </div>
+
+        <!-- Terminal Panel -->
+        <div class="terminal-panel" id="terminal-panel" style="display:none">
+            <div class="terminal-header">
+                <div class="terminal-header-left">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="4 17 10 11 4 5" />
+                        <line x1="12" y1="19" x2="20" y2="19" />
+                    </svg>
+                    <span>Terminal</span>
+                    <span class="terminal-cwd" id="terminal-cwd"></span>
+                </div>
+                <div class="terminal-header-right">
+                    <button class="terminal-clear" id="terminal-clear" title="Clear">Clear</button>
+                    <button class="terminal-close" id="terminal-close" title="Close">&times;</button>
+                </div>
+            </div>
+            <div class="terminal-output" id="terminal-output"></div>
+            <div class="terminal-input-row">
+                <span class="terminal-prompt" id="terminal-prompt">&gt;</span>
+                <input type="text" class="terminal-input" id="terminal-input" placeholder="Type a command..." autofocus>
+            </div>
         </div>
     </main>
 

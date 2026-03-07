@@ -356,3 +356,145 @@ function renderBreadcrumb(path) {
         dirBreadcrumb.appendChild(btn);
     });
 }
+
+
+/* ═══════════════════════════════════════════════════════════
+   Integrated Terminal
+   ═══════════════════════════════════════════════════════════ */
+
+const termPanel = document.getElementById('terminal-panel');
+const termOutput = document.getElementById('terminal-output');
+const termInput = document.getElementById('terminal-input');
+const termCwd = document.getElementById('terminal-cwd');
+const termToggle = document.getElementById('terminal-toggle');
+const termClose = document.getElementById('terminal-close');
+const termClear = document.getElementById('terminal-clear');
+
+let termHistory = [];
+let termHistoryIdx = -1;
+let termOpen = false;
+
+/* Toggle terminal */
+termToggle.addEventListener('click', () => {
+    termOpen = !termOpen;
+    termPanel.style.display = termOpen ? 'flex' : 'none';
+    termToggle.classList.toggle('active', termOpen);
+    if (termOpen) {
+        updateTermCwd();
+        termInput.focus();
+    }
+});
+
+termClose.addEventListener('click', () => {
+    termOpen = false;
+    termPanel.style.display = 'none';
+    termToggle.classList.remove('active');
+});
+
+termClear.addEventListener('click', () => {
+    termOutput.innerHTML = '';
+});
+
+/* Update CWD display in terminal header */
+async function updateTermCwd() {
+    try {
+        const res = await fetch('/api/cwd');
+        const data = await res.json();
+        termCwd.textContent = data.cwd;
+    } catch { /* ignore */ }
+}
+
+/* Run command on Enter */
+termInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const cmd = termInput.value.trim();
+        if (!cmd) return;
+        termHistory.push(cmd);
+        termHistoryIdx = termHistory.length;
+        termInput.value = '';
+        runTerminalCommand(cmd);
+    }
+    // Arrow up/down for history
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (termHistoryIdx > 0) {
+            termHistoryIdx--;
+            termInput.value = termHistory[termHistoryIdx];
+        }
+    }
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (termHistoryIdx < termHistory.length - 1) {
+            termHistoryIdx++;
+            termInput.value = termHistory[termHistoryIdx];
+        } else {
+            termHistoryIdx = termHistory.length;
+            termInput.value = '';
+        }
+    }
+});
+
+async function runTerminalCommand(cmd) {
+    // Show command in output
+    appendTermEntry(cmd, 'Running...', 0, true);
+
+    try {
+        const res = await fetch('/api/terminal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: cmd }),
+        });
+        const data = await res.json();
+
+        // Replace the "Running..." with actual output
+        const entries = termOutput.querySelectorAll('.term-entry');
+        const lastEntry = entries[entries.length - 1];
+        if (lastEntry) {
+            const outEl = lastEntry.querySelector('.term-out, .term-err');
+            if (outEl) {
+                outEl.className = data.exit_code === 0 ? 'term-out' : 'term-err';
+                outEl.textContent = data.output;
+            }
+        }
+
+        // Update CWD display (cd commands change it)
+        if (data.cwd) {
+            termCwd.textContent = data.cwd;
+            cwdPathEl.textContent = data.cwd;
+        }
+
+    } catch (err) {
+        const entries = termOutput.querySelectorAll('.term-entry');
+        const lastEntry = entries[entries.length - 1];
+        if (lastEntry) {
+            const outEl = lastEntry.querySelector('.term-out, .term-err');
+            if (outEl) {
+                outEl.className = 'term-err';
+                outEl.textContent = 'Error: ' + err.message;
+            }
+        }
+    }
+
+    scrollTerminal();
+    termInput.focus();
+}
+
+function appendTermEntry(cmd, output, exitCode, isLoading = false) {
+    const div = document.createElement('div');
+    div.className = 'term-entry';
+    const outClass = isLoading ? 'term-out' : (exitCode === 0 ? 'term-out' : 'term-err');
+    div.innerHTML = `
+        <div class="term-cmd">
+            <span class="term-cmd-prompt">&gt;</span>
+            <span class="term-cmd-text">${escapeHtml(cmd)}</span>
+        </div>
+        <div class="${outClass}">${escapeHtml(output)}</div>
+    `;
+    termOutput.appendChild(div);
+    scrollTerminal();
+}
+
+function scrollTerminal() {
+    termOutput.scrollTop = termOutput.scrollHeight;
+}
+
