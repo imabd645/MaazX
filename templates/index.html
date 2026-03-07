@@ -142,6 +142,15 @@
             </div>
 
             <div class="setting-group">
+                <label class="setting-label">Codebase Indexing (RAG)</label>
+                <div class="setting-toggle-row">
+                    <span class="setting-desc" id="indexing-status-text">Builds a semantic search index</span>
+                    <button id="btn-index-codebase" class="setting-save-btn"
+                        style="flex:0; padding:6px 12px; font-size:11px; white-space:nowrap;">Index Now</button>
+                </div>
+            </div>
+
+            <div class="setting-group">
                 <label class="setting-label">Model</label>
                 <select class="setting-select" id="setting-model">
                     <optgroup label="Gemini (Google AI)">

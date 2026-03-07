@@ -263,6 +263,38 @@ def api_terminal():
     db.save_terminal_entry(entry["command"], entry["output"], entry["exit_code"], entry["cwd"])
     return jsonify(entry)
 
+@app.route("/api/terminal/history", methods=["GET"])
+def api_terminal_history():
+    history = db.get_terminal_history(50)
+    return jsonify({"history": history, "cwd": current_working_dir})
+
+
+# ── RAG / Indexing ──────────────────────────────────────────
+from core import indexer
+
+@app.route("/api/index_codebase", methods=["POST"])
+def api_index_codebase():
+    """Start indexing the current working directory."""
+    if indexer.start_indexing(current_working_dir):
+        return jsonify({"status": "started", "msg": f"Started indexing {current_working_dir}"})
+    else:
+        return jsonify({"status": "already_running", "msg": "Indexing is already in progress"})
+
+@app.route("/api/indexing_status", methods=["GET"])
+def api_indexing_status():
+    """Get the current RAG indexing progress."""
+    return jsonify(indexer.get_indexing_status())
+
+# ── Git / Undo ──────────────────────────────────────────────
+from core import git_backup
+
+@app.route("/api/undo", methods=["POST"])
+def api_undo_action():
+    """Reverts the last agent tool action using git checkout."""
+    result = git_backup.undo_last_agent_action(current_working_dir)
+    return jsonify(result)
+
+
 
 @app.route("/api/terminal/history", methods=["GET"])
 def api_terminal_history():
