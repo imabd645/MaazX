@@ -34,6 +34,16 @@ chat = model.start_chat(enable_automatic_function_calling=True)
 # Current working directory for the agent (default: where the script runs)
 current_working_dir = os.getcwd()
 
+# ── App Settings ────────────────────────────────────────────
+app_settings = {
+    "auto_run_commands": True,
+    "model_name": config.MODEL_NAME,
+    "command_timeout": 60,
+    "max_dir_depth": 3,
+    "tool_mode": "any",           # "any" = forced tool calls, "auto" = model decides
+    "theme": "dark",
+}
+
 
 # ── Routes ──────────────────────────────────────────────────
 @app.route("/")
@@ -55,8 +65,13 @@ def api_chat():
         f"{user_msg}"
     )
 
+    # Use current tool_mode from settings
+    current_tool_cfg = content_types.to_tool_config(
+        {"function_calling_config": {"mode": app_settings["tool_mode"]}}
+    )
+
     try:
-        response = chat.send_message(context_msg, tool_config=tool_cfg)
+        response = chat.send_message(context_msg, tool_config=current_tool_cfg)
 
         # Try to get text reply
         reply_text = None
@@ -161,6 +176,7 @@ def api_browse():
     except PermissionError:
         return jsonify({"error": "Permission denied"}), 403
 
+
 import subprocess
 
 # Shared terminal history so agent's run_command calls also show up in the UI terminal
@@ -190,13 +206,14 @@ def api_terminal():
             terminal_history.append(entry)
             return jsonify(entry)
 
+    timeout = app_settings.get("command_timeout", 60)
     try:
         result = subprocess.run(
             command,
             shell=True,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout,
             cwd=current_working_dir,
         )
         output = ""
@@ -215,7 +232,7 @@ def api_terminal():
         return jsonify(entry)
 
     except subprocess.TimeoutExpired:
-        entry = {"command": command, "output": "Command timed out after 60 seconds.", "exit_code": -1, "cwd": current_working_dir}
+        entry = {"command": command, "output": f"Command timed out after {timeout} seconds.", "exit_code": -1, "cwd": current_working_dir}
         terminal_history.append(entry)
         return jsonify(entry)
     except Exception as e:
@@ -228,6 +245,39 @@ def api_terminal():
 def api_terminal_history():
     """Return recent terminal history (last 50 entries)."""
     return jsonify({"history": terminal_history[-50:], "cwd": current_working_dir})
+
+
+# ── Settings ────────────────────────────────────────────────
+@app.route("/api/settings", methods=["GET"])
+def api_get_settings():
+    return jsonify(app_settings)
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_set_settings():
+    global model, chat, tool_cfg, app_settings
+    data = request.get_json()
+
+    changed_model = False
+    for key in app_settings:
+        if key in data:
+            if key == "model_name" and data[key] != app_settings[key]:
+                changed_model = True
+            app_settings[key] = data[key]
+
+    # Rebuild model if model_name changed
+    if changed_model:
+        try:
+            model = genai.GenerativeModel(
+                model_name=app_settings["model_name"],
+                tools=_tools,
+                system_instruction=config.SYSTEM_INSTRUCTION,
+            )
+            chat = model.start_chat(enable_automatic_function_calling=True)
+        except Exception as e:
+            return jsonify({"error": f"Failed to switch model: {e}"}), 400
+
+    return jsonify(app_settings)
 
 
 if __name__ == "__main__":

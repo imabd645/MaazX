@@ -25,16 +25,20 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('collapsed');
 });
 
-document.getElementById('btn-chat').addEventListener('click', () => {
-    document.getElementById('btn-chat').classList.add('active');
-    document.getElementById('btn-tools').classList.remove('active');
-    document.getElementById('tools-panel').style.display = 'none';
-});
+function switchSidebarTab(active) {
+    ['btn-chat', 'btn-tools', 'btn-settings'].forEach(id => {
+        document.getElementById(id).classList.remove('active');
+    });
+    document.getElementById(active).classList.add('active');
+    document.getElementById('tools-panel').style.display = active === 'btn-tools' ? 'flex' : 'none';
+    document.getElementById('settings-panel').style.display = active === 'btn-settings' ? 'flex' : 'none';
+}
 
-document.getElementById('btn-tools').addEventListener('click', () => {
-    document.getElementById('btn-tools').classList.add('active');
-    document.getElementById('btn-chat').classList.remove('active');
-    document.getElementById('tools-panel').style.display = 'flex';
+document.getElementById('btn-chat').addEventListener('click', () => switchSidebarTab('btn-chat'));
+document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
+document.getElementById('btn-settings').addEventListener('click', () => {
+    switchSidebarTab('btn-settings');
+    loadSettings();
 });
 
 /* New chat */
@@ -498,3 +502,62 @@ function scrollTerminal() {
     termOutput.scrollTop = termOutput.scrollHeight;
 }
 
+
+/* ═══════════════════════════════════════════════════════════
+   Settings Panel
+   ═══════════════════════════════════════════════════════════ */
+
+async function loadSettings() {
+    try {
+        const res = await fetch('/api/settings');
+        const s = await res.json();
+
+        document.getElementById('setting-tool-mode').value = s.tool_mode || 'any';
+        document.getElementById('setting-auto-run').checked = s.auto_run_commands !== false;
+        document.getElementById('setting-model').value = s.model_name || 'gemini-2.5-flash';
+        document.getElementById('setting-timeout').value = s.command_timeout || 60;
+        document.getElementById('setting-depth').value = s.max_dir_depth || 3;
+    } catch { /* ignore */ }
+}
+
+document.getElementById('setting-save').addEventListener('click', async () => {
+    const settings = {
+        tool_mode: document.getElementById('setting-tool-mode').value,
+        auto_run_commands: document.getElementById('setting-auto-run').checked,
+        model_name: document.getElementById('setting-model').value,
+        command_timeout: parseInt(document.getElementById('setting-timeout').value) || 60,
+        max_dir_depth: parseInt(document.getElementById('setting-depth').value) || 3,
+    };
+
+    try {
+        const res = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings),
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        // Show saved indicator
+        const savedEl = document.getElementById('setting-saved');
+        savedEl.style.display = 'inline';
+        setTimeout(() => { savedEl.style.display = 'none'; }, 2000);
+
+        // Update model badge in topbar if model changed
+        const badge = document.querySelector('.model-badge');
+        if (badge) {
+            const modelNames = {
+                'gemini-2.5-flash': 'Gemini 2.5 Flash',
+                'gemini-2.0-flash': 'Gemini 2.0 Flash',
+                'gemini-2.5-pro': 'Gemini 2.5 Pro',
+                'gemini-2.0-pro': 'Gemini 2.0 Pro',
+            };
+            badge.textContent = modelNames[settings.model_name] || settings.model_name;
+        }
+    } catch (err) {
+        alert('Error saving settings: ' + err.message);
+    }
+});
