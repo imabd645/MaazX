@@ -517,6 +517,7 @@ async function loadSettings() {
         document.getElementById('setting-model').value = s.model_name || 'gemini-2.5-flash';
         document.getElementById('setting-timeout').value = s.command_timeout || 60;
         document.getElementById('setting-depth').value = s.max_dir_depth || 3;
+        document.getElementById('setting-openrouter-key').value = s.openrouter_api_key || '';
     } catch { /* ignore */ }
 }
 
@@ -527,6 +528,7 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         model_name: document.getElementById('setting-model').value,
         command_timeout: parseInt(document.getElementById('setting-timeout').value) || 60,
         max_dir_depth: parseInt(document.getElementById('setting-depth').value) || 3,
+        openrouter_api_key: document.getElementById('setting-openrouter-key').value.trim(),
     };
 
     try {
@@ -546,7 +548,7 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         savedEl.style.display = 'inline';
         setTimeout(() => { savedEl.style.display = 'none'; }, 2000);
 
-        // Update model badge in topbar if model changed
+        // Update model badge in topbar
         const badge = document.querySelector('.model-badge');
         if (badge) {
             const modelNames = {
@@ -554,6 +556,7 @@ document.getElementById('setting-save').addEventListener('click', async () => {
                 'gemini-2.0-flash': 'Gemini 2.0 Flash',
                 'gemini-2.5-pro': 'Gemini 2.5 Pro',
                 'gemini-2.0-pro': 'Gemini 2.0 Pro',
+                'gemma-3-27b': 'Gemma 3 27B',
             };
             badge.textContent = modelNames[settings.model_name] || settings.model_name;
         }
