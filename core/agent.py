@@ -30,9 +30,9 @@ class Agent:
         )
 
         # "auto" mode: the model decides when to call a tool vs reply with text.
-        # This allows conversational answers too (e.g. explaining search results).
+        # "any" mode: the model MUST call a tool first — action before talking.
         self.tool_config = content_types.to_tool_config(
-            {"function_calling_config": {"mode": "auto"}}
+            {"function_calling_config": {"mode": "any"}}
         )
 
         # enable_automatic_function_calling lets the SDK

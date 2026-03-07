@@ -26,7 +26,7 @@ model = genai.GenerativeModel(
 )
 
 tool_cfg = content_types.to_tool_config(
-    {"function_calling_config": {"mode": "auto"}}
+    {"function_calling_config": {"mode": "any"}}
 )
 
 chat = model.start_chat(enable_automatic_function_calling=True)
@@ -51,8 +51,7 @@ def api_chat():
 
     # Prepend the current working directory context so the model knows where to operate
     context_msg = (
-        f"[Current working directory: {current_working_dir}]\n"
-        f"All relative file paths should be resolved relative to this directory.\n\n"
+        f"[WORKING DIRECTORY]: {current_working_dir}\n\n"
         f"{user_msg}"
     )
 
