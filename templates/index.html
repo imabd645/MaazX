@@ -342,8 +342,15 @@
                             <textarea class="setting-input" id="wa-rules"
                                 placeholder="System rules for this contact (e.g. Always reply warmly and concisely...)"
                                 style="height: 120px; resize: vertical; margin-bottom: 8px;"></textarea>
-                            <button class="setting-save-btn" id="wa-save-btn" style="width: 100%; padding: 10px;">Save
-                                Contact Rule</button>
+
+                            <div style="display:flex; gap:10px;">
+                                <button class="setting-save-btn" id="wa-save-btn" style="flex:2; padding: 10px;">Save
+                                    Contact Rule</button>
+                                <button class="quick-btn" id="wa-delete-btn"
+                                    style="flex:1; padding: 10px; border-color:red; color:red; display:none;">Delete
+                                    Contact</button>
+                            </div>
+
                             <div style="display:flex; gap:10px; margin-top:15px;">
                                 <button class="quick-btn" id="wa-clear-contact-btn"
                                     style="flex:1; border-color:var(--orange); color:var(--orange); font-size:12px;">Clear

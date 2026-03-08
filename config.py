@@ -7,7 +7,7 @@ import os
 import sys
 
 # ── Gemini API ──────────────────────────────────────────────
-GEMINI_API_KEY = "AIzaSyAUOiTsQjwOUkczwAzZ9kYn3m7b9qiPJsI"
+GEMINI_API_KEY = "AIzaSyAt40F6wSybX_1OGFrYh3-dy8zHQzXFcZM"
 
 MODEL_NAME = "gemini-2.5-flash"
 

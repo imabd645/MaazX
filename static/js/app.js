@@ -749,6 +749,8 @@ async function loadWaContacts() {
     }
 }
 
+const waDeleteBtn = document.getElementById('wa-delete-btn');
+
 if (waSelect) {
     waSelect.addEventListener('change', () => {
         const val = waSelect.value;
@@ -757,20 +759,43 @@ if (waSelect) {
             waName.value = '';
             waRules.value = '';
             waPhone.readOnly = false;
+            waSaveBtn.textContent = 'Add New Contact';
+            if (waDeleteBtn) waDeleteBtn.style.display = 'none';
         } else {
             const contact = waContactsCache[parseInt(val)];
             waPhone.value = contact.phone_number;
             waName.value = contact.name || '';
             waRules.value = contact.rules || '';
             waPhone.readOnly = true; // Prevent changing phone number of existing edit
+            waSaveBtn.textContent = 'Save Changes';
+            if (waDeleteBtn) waDeleteBtn.style.display = 'block';
         }
     });
 
     waSaveBtn.addEventListener('click', async () => {
-        const phone = waPhone.value.trim();
+        let phone = waPhone.value.trim();
         if (!phone) {
             alert('Phone number is required');
             return;
+        }
+
+        // Auto-correct and validate the phone number format
+        phone = phone.replace(/[^0-9c.us@g]/gi, ''); // Strip invalid characters
+
+        if (phone.startsWith('0')) {
+            alert('Invalid Format: Do not use a leading zero. Please start with your country code (e.g. 923350806140).');
+            return;
+        }
+
+        if (phone.length < 10 && !phone.includes('@')) {
+            alert('Invalid Format: Phone number appears too short. Did you include the country code?');
+            return;
+        }
+
+        // Auto-append @c.us if the user forgot it
+        if (!phone.includes('@c.us') && !phone.includes('@g.us')) {
+            phone = `${phone}@c.us`;
+            waPhone.value = phone; // Update the UI so they see the corrected form
         }
 
         const payload = {
@@ -808,6 +833,42 @@ if (waSelect) {
             waSaveBtn.disabled = false;
         }
     });
+
+    if (waDeleteBtn) {
+        waDeleteBtn.addEventListener('click', async () => {
+            const phone = waPhone.value.trim();
+            if (!phone) return;
+            if (!confirm(`Are you sure you want to delete the contact rule for ${phone}?`)) return;
+
+            waDeleteBtn.textContent = 'Deleting...';
+            waDeleteBtn.disabled = true;
+
+            try {
+                await fetch('/api/whatsapp/contacts', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone_number: phone })
+                });
+
+                waDeleteBtn.textContent = 'Deleted!';
+                setTimeout(() => {
+                    waDeleteBtn.textContent = 'Delete Contact';
+                    waDeleteBtn.disabled = false;
+                }, 1500);
+
+                await loadWaContacts();
+
+                // Reset to "Add New Contact" mode
+                waSelect.value = 'new';
+                waSelect.dispatchEvent(new Event('change'));
+
+            } catch (err) {
+                alert('Failed to delete WA contact');
+                waDeleteBtn.textContent = 'Delete Contact';
+                waDeleteBtn.disabled = false;
+            }
+        });
+    }
 
     const waClearContactBtn = document.getElementById('wa-clear-contact-btn');
     if (waClearContactBtn) {

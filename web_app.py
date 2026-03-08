@@ -322,13 +322,37 @@ def api_get_wa_contacts():
 def api_save_wa_contact():
     """Save or update a WhatsApp contact rule."""
     data = request.json
+    raw_phone = data.get("phone_number", "").strip()
+    
+    # Robust Backend Sanitization
+    import re
+    sanitized = re.sub(r'[^0-9c.us@g]', '', raw_phone)
+    if sanitized.startswith('0'):
+        # Just in case they bypass UI, auto-assume Pakistan (+92) if it starts with 0
+        sanitized = "92" + sanitized[1:]
+    
+    if sanitized and not sanitized.endswith("@c.us") and not sanitized.endswith("@g.us"):
+        sanitized += "@c.us"
+
     db.save_wa_contact(
-        data.get("phone_number", ""),
+        sanitized,
         data.get("name", "Unknown Contact"),
         data.get("summary", ""),
         data.get("rules", "")
     )
     return jsonify({"success": True})
+
+@app.route("/api/whatsapp/contacts", methods=["DELETE"])
+def api_delete_wa_contact():
+    """Delete a customized WhatsApp contact."""
+    data = request.json or {}
+    phone = data.get("phone_number")
+    try:
+        if phone:
+            db.delete_wa_contact(phone)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/whatsapp/logout", methods=["POST"])
 def api_wa_logout():
