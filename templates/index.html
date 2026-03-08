@@ -111,76 +111,7 @@
             </div>
         </div>
 
-        <!-- Settings Panel -->
-        <div class="sidebar-settings" id="settings-panel" style="display:none">
-            <div class="setting-group">
-                <label class="setting-label">Tool Calling Mode</label>
-                <select class="setting-select" id="setting-tool-mode">
-                    <option value="any">Forced (always call tool)</option>
-                    <option value="auto">Auto (model decides)</option>
-                </select>
-                <span class="setting-hint">Forced = action-first, Auto = can respond with text only</span>
-            </div>
 
-            <div class="setting-group">
-                <label class="setting-label">Auto Run Commands</label>
-                <div class="setting-toggle-row">
-                    <span class="setting-desc">Agent auto-executes commands</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="setting-auto-run" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <label class="setting-label">Codebase Indexing (RAG)</label>
-                <div class="setting-toggle-row">
-                    <span class="setting-desc" id="indexing-status-text">Builds a semantic search index</span>
-                    <button id="btn-index-codebase" class="setting-save-btn"
-                        style="flex:0; padding:6px 12px; font-size:11px; white-space:nowrap;">Index Now</button>
-                </div>
-            </div>
-
-            <div class="setting-group">
-                <label class="setting-label">Model</label>
-                <select class="setting-select" id="setting-model">
-                    <optgroup label="Gemini (Google AI)">
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                        <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
-                    </optgroup>
-                    <optgroup label="OpenRouter">
-                        <option value="gemma-3-27b">Gemma 3 27B</option>
-                    </optgroup>
-                </select>
-                <span class="setting-hint">Changing model resets the chat session</span>
-            </div>
-
-            <div class="setting-group">
-                <label class="setting-label">OpenRouter API Key</label>
-                <input type="password" class="setting-input" id="setting-openrouter-key" placeholder="sk-or-...">
-                <span class="setting-hint">Required for Gemma and other OpenRouter models</span>
-            </div>
-
-            <div class="setting-group">
-                <label class="setting-label">Command Timeout (seconds)</label>
-                <input type="number" class="setting-input" id="setting-timeout" value="60" min="5" max="300">
-            </div>
-
-            <div class="setting-group">
-                <label class="setting-label">Max Directory Depth</label>
-                <input type="number" class="setting-input" id="setting-depth" value="3" min="1" max="10">
-            </div>
-
-
-
-            <div class="setting-actions">
-                <button class="setting-save-btn" id="setting-save">Save Settings</button>
-                <span class="setting-saved" id="setting-saved" style="display:none">Saved!</span>
-            </div>
-        </div>
 
         <div class="sidebar-footer" style="display:flex; flex-direction:column; gap:8px;">
             <button class="new-chat-btn" id="btn-wa-view"
@@ -319,6 +250,14 @@
                             <input type="password" class="setting-input" id="setting-openrouter-key"
                                 placeholder="sk-or-...">
                             <span class="setting-hint">Required for Gemma and other OpenRouter models</span>
+                        </div>
+
+                        <div class="setting-group"
+                            style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 15px;">
+                            <label class="setting-label">WhatsApp Owner Name</label>
+                            <input type="text" class="setting-input" id="setting-wa-owner" placeholder="e.g. John Doe">
+                            <span class="setting-hint">The name the AI agent uses to refer to you when chatting with
+                                others on WhatsApp.</span>
                         </div>
                     </div>
 
