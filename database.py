@@ -223,5 +223,14 @@ def get_wa_history(phone_number: str, limit: int = 40):
     conn.close()
     return [dict(row) for row in rows]
 
+def clear_wa_history(phone_number: str = None):
+    conn = _get_conn()
+    if phone_number:
+        conn.execute("DELETE FROM whatsapp_messages WHERE phone_number = ?", (phone_number,))
+    else:
+        conn.execute("DELETE FROM whatsapp_messages")
+    conn.commit()
+    conn.close()
+
 # Initialize DB on import
 init_db()

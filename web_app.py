@@ -340,6 +340,17 @@ def api_wa_logout():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/whatsapp/history", methods=["DELETE"])
+def api_clear_wa_history():
+    """Clear message history for a specific contact or all."""
+    data = request.json or {}
+    phone = data.get("phone_number")
+    try:
+        db.clear_wa_history(phone)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 # ── Settings ────────────────────────────────────────────────
 @app.route("/api/settings", methods=["GET"])
