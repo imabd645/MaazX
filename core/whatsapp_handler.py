@@ -38,23 +38,25 @@ def handle_incoming_message(msg_data: dict):
     # Get the last 20 messages for context
     history = database.get_wa_history(sender, limit=20)
 
+    # 4. Generate AI Reply
+    settings = database.load_settings()
+    model_name = settings.get("model_name", "gemini-2.5-flash")
+    owner_name = settings.get("wa_owner_name", "User")
+
     # 3. Build the System Prompt
     system_prompt = f"""
-    You are an AI assistant managing WhatsApp messages on behalf of the user.
+    You are an AI assistant managing WhatsApp messages on behalf of {owner_name}.
     You are currently talking to: {contact_name} ({sender}).
     
     Specific Rules for this contact:
     {rules}
     
     General Guidelines:
+    - You represent {owner_name}. If asked who you are, explain you are {owner_name}'s AI assistant.
     - Keep replies concise, natural, and human-sounding (WhatsApp style).
     - Do not use markdown like bolding (**) overly much, keep it plain.
     - If a message seems urgent, flag it by starting your reply with [URGENT].
     """
-
-    # 4. Generate AI Reply
-    settings = database.load_settings()
-    model_name = settings.get("model_name", "gemini-2.5-flash")
 
     reply_text = "I'm sorry, I encountered an error processing your message."
 

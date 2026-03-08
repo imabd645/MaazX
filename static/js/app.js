@@ -610,23 +610,38 @@ async function loadSettings() {
         const res = await fetch('/api/settings');
         const s = await res.json();
 
-        document.getElementById('setting-tool-mode').value = s.tool_mode || 'any';
-        document.getElementById('setting-auto-run').checked = s.auto_run_commands !== false;
-        document.getElementById('setting-model').value = s.model_name || 'gemini-2.5-flash';
-        document.getElementById('setting-timeout').value = s.command_timeout || 60;
-        document.getElementById('setting-depth').value = s.max_dir_depth || 3;
-        document.getElementById('setting-openrouter-key').value = s.openrouter_api_key || '';
+        const elToolMode = document.getElementById('setting-tool-mode');
+        if (elToolMode) elToolMode.value = s.tool_mode || 'any';
+
+        const elAutoRun = document.getElementById('setting-auto-run');
+        if (elAutoRun) elAutoRun.checked = s.auto_run_commands !== false;
+
+        const elModel = document.getElementById('setting-model');
+        if (elModel) elModel.value = s.model_name || 'gemini-2.5-flash';
+
+        const elTimeout = document.getElementById('setting-timeout');
+        if (elTimeout) elTimeout.value = s.command_timeout || 60;
+
+        const elDepth = document.getElementById('setting-depth');
+        if (elDepth) elDepth.value = s.max_dir_depth || 3;
+
+        const elOpRouter = document.getElementById('setting-openrouter-key');
+        if (elOpRouter) elOpRouter.value = s.openrouter_api_key || '';
+
+        const elOwner = document.getElementById('setting-wa-owner');
+        if (elOwner) elOwner.value = s.wa_owner_name || 'User';
     } catch { /* ignore */ }
 }
 
 document.getElementById('setting-save').addEventListener('click', async () => {
     const settings = {
-        tool_mode: document.getElementById('setting-tool-mode').value,
-        auto_run_commands: document.getElementById('setting-auto-run').checked,
-        model_name: document.getElementById('setting-model').value,
-        command_timeout: parseInt(document.getElementById('setting-timeout').value) || 60,
-        max_dir_depth: parseInt(document.getElementById('setting-depth').value) || 3,
-        openrouter_api_key: document.getElementById('setting-openrouter-key').value.trim(),
+        tool_mode: document.getElementById('setting-tool-mode')?.value || 'any',
+        auto_run_commands: document.getElementById('setting-auto-run')?.checked !== false,
+        model_name: document.getElementById('setting-model')?.value || 'gemini-2.5-flash',
+        command_timeout: parseInt(document.getElementById('setting-timeout')?.value) || 60,
+        max_dir_depth: parseInt(document.getElementById('setting-depth')?.value) || 3,
+        openrouter_api_key: document.getElementById('setting-openrouter-key')?.value?.trim() || '',
+        wa_owner_name: document.getElementById('setting-wa-owner')?.value?.trim() || 'User',
     };
 
     try {
@@ -793,6 +808,58 @@ if (waSelect) {
             waSaveBtn.disabled = false;
         }
     });
+
+    const waClearContactBtn = document.getElementById('wa-clear-contact-btn');
+    if (waClearContactBtn) {
+        waClearContactBtn.addEventListener('click', async () => {
+            const phone = waPhone.value.trim();
+            if (!phone) {
+                alert('Select or enter a contact first to clear their history.');
+                return;
+            }
+            if (!confirm(`Are you sure you want to clear AI conversation history with ${phone}? This cannot be undone.`)) {
+                return;
+            }
+            try {
+                const res = await fetch('/api/whatsapp/history', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone_number: phone })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('History cleared successfully for this contact.');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                alert('Failed to clear history');
+            }
+        });
+    }
+
+    const waClearAllBtn = document.getElementById('wa-clear-all-btn');
+    if (waClearAllBtn) {
+        waClearAllBtn.addEventListener('click', async () => {
+            if (!confirm('Are you ABSOLUTELY sure you want to clear ALL WhatsApp history for ALL contacts?')) {
+                return;
+            }
+            try {
+                const res = await fetch('/api/whatsapp/history', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('All WhatsApp conversation history has been cleared.');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (err) {
+                alert('Failed to clear all history');
+            }
+        });
+    }
 
     // Load immediately
     loadWaContacts();
