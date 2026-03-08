@@ -26,28 +26,36 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    ['btn-chat', 'btn-tools', 'btn-settings'].forEach(id => {
-        document.getElementById(id).classList.remove('active');
+    let ids = ['btn-chat', 'btn-tools'];
+    ids.forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.classList.remove('active');
     });
-    document.getElementById(active).classList.add('active');
-    document.getElementById('tools-panel').style.display = active === 'btn-tools' ? 'flex' : 'none';
-    document.getElementById('settings-panel').style.display = active === 'btn-settings' ? 'flex' : 'none';
+
+    let activeBtn = document.getElementById(active);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    let toolsPanel = document.getElementById('tools-panel');
+    if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'flex' : 'none';
 }
 
-document.getElementById('btn-chat').addEventListener('click', () => switchSidebarTab('btn-chat'));
-document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
-document.getElementById('btn-settings').addEventListener('click', () => {
-    switchSidebarTab('btn-settings');
-    loadSettings();
+document.getElementById('btn-chat').addEventListener('click', () => {
+    switchSidebarTab('btn-chat');
+    document.getElementById('chat-area').style.display = 'flex';
+    document.getElementById('whatsapp-area').style.display = 'none';
+    document.getElementById('settings-area').style.display = 'none';
 });
+
+document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
 
 /* New chat */
 document.getElementById('btn-new-chat').addEventListener('click', async () => {
-    // Switch to chat view if we are on WhatsApp view
-    if (document.getElementById('whatsapp-area')) {
-        document.getElementById('whatsapp-area').style.display = 'none';
-        document.getElementById('chat-area').style.display = 'flex';
-    }
+    // Switch to chat view if we are on another view
+    ['whatsapp-area', 'settings-area'].forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    document.getElementById('chat-area').style.display = 'flex';
 
     await fetch('/api/reset', { method: 'POST' });
     messagesDiv.innerHTML = '';
@@ -59,7 +67,18 @@ document.getElementById('btn-new-chat').addEventListener('click', async () => {
 if (document.getElementById('btn-wa-view')) {
     document.getElementById('btn-wa-view').addEventListener('click', () => {
         document.getElementById('chat-area').style.display = 'none';
+        document.getElementById('settings-area').style.display = 'none';
         document.getElementById('whatsapp-area').style.display = 'block';
+    });
+}
+
+/* Settings View Toggle */
+if (document.getElementById('btn-settings-view')) {
+    document.getElementById('btn-settings-view').addEventListener('click', () => {
+        document.getElementById('chat-area').style.display = 'none';
+        document.getElementById('whatsapp-area').style.display = 'none';
+        document.getElementById('settings-area').style.display = 'block';
+        loadSettings(); // load values into the form
     });
 }
 
