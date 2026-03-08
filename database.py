@@ -73,6 +73,7 @@ DEFAULT_SETTINGS = {
     "tool_mode": "any",
     "theme": "dark",
     "openrouter_api_key": "",
+    "wa_owner_name": "User",
 }
 
 
