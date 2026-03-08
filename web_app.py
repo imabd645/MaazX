@@ -294,12 +294,51 @@ def api_undo_action():
     result = git_backup.undo_last_agent_action(current_working_dir)
     return jsonify(result)
 
+# ── WhatsApp Agent ──────────────────────────────────────────
+from core import whatsapp_handler
+import threading
 
+@app.route("/api/whatsapp/incoming", methods=["POST"])
+def api_whatsapp_incoming():
+    """Webhook for Node.js bridge to send incoming WhatsApp messages."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "No payload"}), 400
+        
+    # Process message in background to not block the Express bridge
+    thread = threading.Thread(target=whatsapp_handler.handle_incoming_message, args=(data,))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"status": "received"})
 
-@app.route("/api/terminal/history", methods=["GET"])
-def api_terminal_history():
-    history = db.get_terminal_history(50)
-    return jsonify({"history": history, "cwd": current_working_dir})
+@app.route("/api/whatsapp/contacts", methods=["GET"])
+def api_get_wa_contacts():
+    """Retrieve all customized WhatsApp contacts."""
+    contacts = db.get_all_wa_contacts()
+    return jsonify(contacts)
+
+@app.route("/api/whatsapp/contacts", methods=["POST"])
+def api_save_wa_contact():
+    """Save or update a WhatsApp contact rule."""
+    data = request.json
+    db.save_wa_contact(
+        data.get("phone_number", ""),
+        data.get("name", "Unknown Contact"),
+        data.get("summary", ""),
+        data.get("rules", "")
+    )
+    return jsonify({"success": True})
+
+@app.route("/api/whatsapp/logout", methods=["POST"])
+def api_wa_logout():
+    """Logs the user out of the WhatsApp bridge session."""
+    try:
+        res = requests.post("http://127.0.0.1:3000/logout", timeout=10)
+        res.raise_for_status()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Settings ────────────────────────────────────────────────
