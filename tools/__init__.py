@@ -18,3 +18,6 @@ import tools.search_in_files
 
 # Shell
 import tools.run_command
+
+# WhatsApp
+import tools.send_whatsapp

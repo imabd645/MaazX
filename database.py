@@ -205,6 +205,12 @@ def save_wa_contact(phone_number: str, name: str, summary: str = "", rules: str 
     conn.commit()
     conn.close()
 
+def delete_wa_contact(phone_number: str):
+    conn = _get_conn()
+    conn.execute("DELETE FROM whatsapp_contacts WHERE phone_number = ?", (phone_number,))
+    conn.commit()
+    conn.close()
+
 def save_wa_message(phone_number: str, role: str, content: str):
     conn = _get_conn()
     conn.execute(

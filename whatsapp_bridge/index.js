@@ -99,12 +99,22 @@ app.post('/send', async (req, res) => {
     }
 
     try {
-        // Send a message via whatsapp-web.js
-        const sentMsg = await client.sendMessage(to, message);
+        // Enforce the WhatsApp internal ID suffix if it's missing (needed for proactive messages)
+        let chatId = to;
+        if (!chatId.includes('@c.us') && !chatId.includes('@g.us')) {
+            chatId = `${chatId.replace(/[^0-9]/g, '')}@c.us`;
+        }
+
+        // Send a message exactly how we do for replies
+        const sentMsg = await client.sendMessage(chatId, message);
         res.json({ success: true, messageId: sentMsg.id._serialized });
         console.log(`[Outgoing] ${to}: ${message}`);
     } catch (err) {
-        console.error('Error sending WhatsApp message:', err);
+        console.error('Error sending WhatsApp message:', err.message);
+        const errStr = err.message || "";
+        if (errStr.includes("t: t") || errStr.includes("evaluate") || errStr.includes("undefined")) {
+            return res.status(400).json({ error: "WhatsApp Web rejected the phone number format. Ensure the number includes the exact International Country Code WITHOUT a leading zero or '+' symbol (e.g. use '923350806140' instead of '03350806140')." });
+        }
         res.status(500).json({ error: err.message });
     }
 });
