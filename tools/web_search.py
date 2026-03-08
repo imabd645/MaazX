@@ -1,10 +1,12 @@
-import requests
 from bs4 import BeautifulSoup
+from core.tool_registry import register_tool
+
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 except ImportError:
     DDGS = None
 
+@register_tool
 def search_web(query: str, max_results: int = 5) -> str:
     """
     Searches the web and returns the top results.
@@ -34,6 +36,7 @@ def search_web(query: str, max_results: int = 5) -> str:
     except Exception as e:
         return f"Error performing web search: {str(e)}"
 
+@register_tool
 def read_webpage(url: str) -> str:
     """
     Fetches a webpage and extracts its main text content.

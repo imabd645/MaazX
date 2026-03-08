@@ -21,3 +21,6 @@ import tools.run_command
 
 # WhatsApp
 import tools.send_whatsapp
+
+# Connectivity
+import tools.web_search

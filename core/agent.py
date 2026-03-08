@@ -12,6 +12,8 @@ import config
 from core.tool_registry import get_all_tools
 
 
+import datetime
+
 class Agent:
     """Wraps a Gemini model with automatic tool-calling and a REPL loop."""
 
@@ -23,10 +25,13 @@ class Agent:
         if not tools:
             raise RuntimeError("No tools registered. Import your tool modules before creating the Agent.")
 
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        time_context = f"\n\n[SYSTEM CLOCK] The current date and time is: {current_time}. Prioritize web search results and timelines over your pre-training data if they conflict."
+
         self.model = genai.GenerativeModel(
             model_name=config.MODEL_NAME,
             tools=tools,
-            system_instruction=config.SYSTEM_INSTRUCTION,
+            system_instruction=config.SYSTEM_INSTRUCTION + time_context,
         )
 
         # "auto" mode: the model decides when to call a tool vs reply with text.
