@@ -44,6 +44,21 @@ def init_db():
             cwd       TEXT NOT NULL,
             timestamp REAL NOT NULL
         );
+        
+        CREATE TABLE IF NOT EXISTS whatsapp_contacts (
+            phone_number TEXT PRIMARY KEY,
+            name         TEXT,
+            summary      TEXT DEFAULT '',
+            rules        TEXT DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS whatsapp_messages (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone_number TEXT NOT NULL,
+            role         TEXT NOT NULL,
+            content      TEXT NOT NULL,
+            timestamp    REAL NOT NULL
+        );
     """)
     conn.commit()
     conn.close()
@@ -165,6 +180,47 @@ def get_terminal_history(limit: int = 50):
     conn.close()
     return [dict(row) for row in reversed(rows)]
 
+
+# ── WhatsApp Agent ────────────────────────────────────────────
+
+def get_wa_contact(phone_number: str) -> dict:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM whatsapp_contacts WHERE phone_number = ?", (phone_number,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_all_wa_contacts():
+    conn = _get_conn()
+    rows = conn.execute("SELECT phone_number, name, summary, rules FROM whatsapp_contacts ORDER BY name ASC").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def save_wa_contact(phone_number: str, name: str, summary: str = "", rules: str = ""):
+    conn = _get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO whatsapp_contacts (phone_number, name, summary, rules) VALUES (?, ?, ?, ?)",
+        (phone_number, name, summary, rules)
+    )
+    conn.commit()
+    conn.close()
+
+def save_wa_message(phone_number: str, role: str, content: str):
+    conn = _get_conn()
+    conn.execute(
+        "INSERT INTO whatsapp_messages (phone_number, role, content, timestamp) VALUES (?, ?, ?, ?)",
+        (phone_number, role, content, time.time())
+    )
+    conn.commit()
+    conn.close()
+
+def get_wa_history(phone_number: str, limit: int = 40):
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT role, content, timestamp FROM whatsapp_messages WHERE phone_number = ? ORDER BY id ASC LIMIT ?",
+        (phone_number, limit)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 # Initialize DB on import
 init_db()

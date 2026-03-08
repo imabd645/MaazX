@@ -43,11 +43,47 @@ document.getElementById('btn-settings').addEventListener('click', () => {
 
 /* New chat */
 document.getElementById('btn-new-chat').addEventListener('click', async () => {
+    // Switch to chat view if we are on WhatsApp view
+    if (document.getElementById('whatsapp-area')) {
+        document.getElementById('whatsapp-area').style.display = 'none';
+        document.getElementById('chat-area').style.display = 'flex';
+    }
+
     await fetch('/api/reset', { method: 'POST' });
     messagesDiv.innerHTML = '';
     welcome.classList.remove('hidden');
     input.focus();
 });
+
+/* WhatsApp View Toggle */
+if (document.getElementById('btn-wa-view')) {
+    document.getElementById('btn-wa-view').addEventListener('click', () => {
+        document.getElementById('chat-area').style.display = 'none';
+        document.getElementById('whatsapp-area').style.display = 'block';
+    });
+}
+
+/* WhatsApp Logout */
+if (document.getElementById('wa-logout-btn')) {
+    document.getElementById('wa-logout-btn').addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to log out of the WhatsApp session?')) return;
+
+        const btn = document.getElementById('wa-logout-btn');
+        const oldText = btn.textContent;
+        btn.textContent = 'Logging out...';
+        btn.disabled = true;
+
+        try {
+            await fetch('/api/whatsapp/logout', { method: 'POST' });
+            alert('Logged out successfully! You will need to scan a new QR code to reconnect.');
+        } catch (err) {
+            alert('Failed to log out.');
+        } finally {
+            btn.textContent = oldText;
+            btn.disabled = false;
+        }
+    });
+}
 
 /* Quick action buttons */
 document.querySelectorAll('.quick-btn').forEach(btn => {
@@ -649,3 +685,96 @@ document.getElementById('btn-index-codebase').addEventListener('click', async ()
         btn.disabled = false;
     }
 });
+
+/* ═══════════════════════════════════════════════════════════
+   WhatsApp Contacts Management
+   ═══════════════════════════════════════════════════════════ */
+
+const waSelect = document.getElementById('wa-contact-select');
+const waPhone = document.getElementById('wa-phone');
+const waName = document.getElementById('wa-name');
+const waRules = document.getElementById('wa-rules');
+const waSaveBtn = document.getElementById('wa-save-btn');
+
+let waContactsCache = [];
+
+async function loadWaContacts() {
+    try {
+        const res = await fetch('/api/whatsapp/contacts');
+        waContactsCache = await res.json();
+
+        waSelect.innerHTML = '<option value="new">-- Add New Contact --</option>';
+        waContactsCache.forEach((contact, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx.toString();
+            opt.textContent = `${contact.name} (${contact.phone_number})`;
+            waSelect.appendChild(opt);
+        });
+    } catch (err) {
+        console.error("Error loading WA contacts:", err);
+    }
+}
+
+if (waSelect) {
+    waSelect.addEventListener('change', () => {
+        const val = waSelect.value;
+        if (val === 'new') {
+            waPhone.value = '';
+            waName.value = '';
+            waRules.value = '';
+            waPhone.readOnly = false;
+        } else {
+            const contact = waContactsCache[parseInt(val)];
+            waPhone.value = contact.phone_number;
+            waName.value = contact.name || '';
+            waRules.value = contact.rules || '';
+            waPhone.readOnly = true; // Prevent changing phone number of existing edit
+        }
+    });
+
+    waSaveBtn.addEventListener('click', async () => {
+        const phone = waPhone.value.trim();
+        if (!phone) {
+            alert('Phone number is required');
+            return;
+        }
+
+        const payload = {
+            phone_number: phone,
+            name: waName.value.trim(),
+            rules: waRules.value.trim()
+        };
+
+        waSaveBtn.textContent = 'Saving...';
+        waSaveBtn.disabled = true;
+
+        try {
+            await fetch('/api/whatsapp/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            waSaveBtn.textContent = 'Saved!';
+            setTimeout(() => {
+                waSaveBtn.textContent = 'Save Contact Rule';
+                waSaveBtn.disabled = false;
+            }, 1500);
+
+            // Reload the dropdown to reflect saved data
+            await loadWaContacts();
+
+            // Reselect the saved contact in dropdown
+            const idx = waContactsCache.findIndex(c => c.phone_number === phone);
+            if (idx !== -1) waSelect.value = idx.toString();
+
+        } catch (err) {
+            alert('Failed to save WA contact');
+            waSaveBtn.textContent = 'Save Contact Rule';
+            waSaveBtn.disabled = false;
+        }
+    });
+
+    // Load immediately
+    loadWaContacts();
+}
