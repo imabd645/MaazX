@@ -27,3 +27,6 @@ import tools.web_search
 
 # Automation
 import tools.schedule_action
+
+# Data Inspection
+import tools.inspect_database
