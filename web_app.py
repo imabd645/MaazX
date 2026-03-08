@@ -410,7 +410,26 @@ def api_set_settings():
 
     return jsonify(app_settings)
 
+@app.route("/api/jobs", methods=["GET"])
+def api_get_jobs():
+    """Returns a list of all scheduled cron jobs."""
+    import core.scheduler as scheduler_module
+    jobs = scheduler_module.get_all_jobs()
+    return jsonify({"jobs": jobs})
+
+@app.route("/api/jobs/<job_id>", methods=["DELETE"])
+def api_delete_job(job_id):
+    """Deletes a scheduled cron job by ID."""
+    import core.scheduler as scheduler_module
+    success = scheduler_module.remove_job(job_id)
+    if success:
+        return jsonify({"success": True})
+    return jsonify({"error": "Failed to remove job"}), 500
+
 
 if __name__ == "__main__":
+    import core.scheduler
+    core.scheduler.start_scheduler()
+    
     print("\n>>> Agent Web UI starting at http://localhost:5000\n")
     app.run(debug=False, port=5000)

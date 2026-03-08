@@ -24,3 +24,6 @@ import tools.send_whatsapp
 
 # Connectivity
 import tools.web_search
+
+# Automation
+import tools.schedule_action

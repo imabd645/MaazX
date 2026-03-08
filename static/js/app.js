@@ -26,7 +26,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-whatsapp', 'btn-settings', 'btn-jobs'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -37,24 +37,49 @@ function switchSidebarTab(active) {
 
     let toolsPanel = document.getElementById('tools-panel');
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'flex' : 'none';
+
+    // Hide all main areas
+    ['chat-area', 'whatsapp-area', 'settings-area', 'jobs-area'].forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
 }
 
 document.getElementById('btn-chat').addEventListener('click', () => {
     switchSidebarTab('btn-chat');
     document.getElementById('chat-area').style.display = 'flex';
-    document.getElementById('whatsapp-area').style.display = 'none';
-    document.getElementById('settings-area').style.display = 'none';
 });
+
+document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
+
+if (document.getElementById('btn-whatsapp')) {
+    document.getElementById('btn-whatsapp').addEventListener('click', () => {
+        switchSidebarTab('btn-whatsapp');
+        document.getElementById('whatsapp-area').style.display = 'block';
+    });
+}
+
+if (document.getElementById('btn-settings')) {
+    document.getElementById('btn-settings').addEventListener('click', () => {
+        switchSidebarTab('btn-settings');
+        document.getElementById('settings-area').style.display = 'block';
+        loadSettings();
+    });
+}
+
+if (document.getElementById('btn-jobs')) {
+    document.getElementById('btn-jobs').addEventListener('click', () => {
+        switchSidebarTab('btn-jobs');
+        document.getElementById('jobs-area').style.display = 'block';
+        loadJobs();
+    });
+}
 
 document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
 
 /* New chat */
 document.getElementById('btn-new-chat').addEventListener('click', async () => {
-    // Switch to chat view if we are on another view
-    ['whatsapp-area', 'settings-area'].forEach(id => {
-        let el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-    });
+    switchSidebarTab('btn-chat');
     document.getElementById('chat-area').style.display = 'flex';
 
     await fetch('/api/reset', { method: 'POST' });
@@ -63,24 +88,7 @@ document.getElementById('btn-new-chat').addEventListener('click', async () => {
     input.focus();
 });
 
-/* WhatsApp View Toggle */
-if (document.getElementById('btn-wa-view')) {
-    document.getElementById('btn-wa-view').addEventListener('click', () => {
-        document.getElementById('chat-area').style.display = 'none';
-        document.getElementById('settings-area').style.display = 'none';
-        document.getElementById('whatsapp-area').style.display = 'block';
-    });
-}
-
-/* Settings View Toggle */
-if (document.getElementById('btn-settings-view')) {
-    document.getElementById('btn-settings-view').addEventListener('click', () => {
-        document.getElementById('chat-area').style.display = 'none';
-        document.getElementById('whatsapp-area').style.display = 'none';
-        document.getElementById('settings-area').style.display = 'block';
-        loadSettings(); // load values into the form
-    });
-}
+/* Legacy button listeners removed */
 
 /* WhatsApp Logout */
 if (document.getElementById('wa-logout-btn')) {
@@ -924,4 +932,63 @@ if (waSelect) {
 
     // Load immediately
     loadWaContacts();
+}
+
+/* ── Jobs Logic ────────────────────────────────────────── */
+async function loadJobs() {
+    const container = document.getElementById('jobs-list-container');
+    if (!container) return;
+
+    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">Fetching jobs...</div>';
+
+    try {
+        const res = await fetch('/api/jobs');
+        const data = await res.json();
+        const jobs = data.jobs || [];
+
+        if (jobs.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">No scheduled tasks currently active. Ask the AI to schedule one!</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        jobs.forEach(job => {
+            const el = document.createElement('div');
+            el.style.cssText = 'background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:15px; display:flex; justify-content:space-between; align-items:center;';
+            el.innerHTML = `
+                <div>
+                    <h4 style="margin:0 0 5px 0; color:var(--text-primary);">${job.name || 'Task'}</h4>
+                    <div style="font-size:13px; color:var(--text-secondary);">
+                        <span style="color:var(--accent);">Next Run:</span> ${job.next_run_time}<br>
+                        <span style="color:var(--green);">Action:</span> ${job.prompt || 'No specific prompt found'}
+                    </div>
+                </div>
+                <button class="quick-btn" style="border-color:red; color:red;" onclick="deleteJob('${job.id}')">Remove</button>
+            `;
+            container.appendChild(el);
+        });
+
+    } catch (err) {
+        container.innerHTML = `<div style="color:red; text-align:center; padding: 20px;">Failed to load jobs: ${err.message}</div>`;
+    }
+}
+
+window.deleteJob = async function (jobId) {
+    if (!confirm('Are you sure you want to delete this scheduled task?')) return;
+
+    try {
+        const res = await fetch(`/api/jobs/${jobId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            loadJobs();
+        } else {
+            alert('Failed to delete job: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Exception while deleting job: ' + err.message);
+    }
+}
+
+if (document.getElementById('jobs-refresh-btn')) {
+    document.getElementById('jobs-refresh-btn').addEventListener('click', loadJobs);
 }
