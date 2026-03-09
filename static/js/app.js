@@ -36,24 +36,32 @@ function switchSidebarTab(active) {
     if (activeBtn) activeBtn.classList.add('active');
 
     let toolsPanel = document.getElementById('tools-panel');
-    if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'flex' : 'none';
+    if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
-    // Hide all main areas
-    ['chat-area', 'whatsapp-area', 'settings-area', 'jobs-area'].forEach(id => {
+    // Hide all center pane areas
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'welcome'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
 }
 
-document.getElementById('btn-chat').addEventListener('click', () => {
-    switchSidebarTab('btn-chat');
-    document.getElementById('chat-area').style.display = 'flex';
-});
+if (document.getElementById('btn-chat')) {
+    document.getElementById('btn-chat').addEventListener('click', () => {
+        switchSidebarTab('btn-chat');
+        // Chat button just shows the welcome screen in the center
+        document.getElementById('welcome').style.display = 'flex';
+    });
+}
 
-document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
+if (document.getElementById('btn-tools')) {
+    document.getElementById('btn-tools').addEventListener('click', () => {
+        switchSidebarTab('btn-tools');
+        document.getElementById('welcome').style.display = 'flex';
+    });
+}
 
-if (document.getElementById('btn-whatsapp')) {
-    document.getElementById('btn-whatsapp').addEventListener('click', () => {
+if (document.getElementById('btn-wa-view')) {
+    document.getElementById('btn-wa-view').addEventListener('click', () => {
         switchSidebarTab('btn-whatsapp');
         document.getElementById('whatsapp-area').style.display = 'block';
     });
@@ -75,18 +83,56 @@ if (document.getElementById('btn-jobs')) {
     });
 }
 
-document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
+if (document.getElementById('btn-tools')) {
+    document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
+}
+
+/* Theme Toggle */
+const btnThemeToggle = document.getElementById('btn-theme-toggle');
+if (btnThemeToggle) {
+    const isLight = localStorage.getItem('theme') === 'light';
+    const hljsTheme = document.getElementById('hljs-theme');
+    const svgPath = document.getElementById('theme-icon-path');
+
+    if (isLight) {
+        document.body.classList.add('light-theme');
+        if (hljsTheme) hljsTheme.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
+        if (svgPath) svgPath.setAttribute('d', 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z');
+    }
+
+    btnThemeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('light-theme');
+        const lightOn = document.body.classList.contains('light-theme');
+        localStorage.setItem('theme', lightOn ? 'light' : 'dark');
+
+        if (hljsTheme) {
+            hljsTheme.href = lightOn
+                ? "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
+                : "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css";
+        }
+
+        if (svgPath) {
+            if (lightOn) {
+                svgPath.setAttribute('d', 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z'); // Moon
+            } else {
+                svgPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z'); // Sun
+            }
+        }
+    });
+}
 
 /* New chat */
-document.getElementById('btn-new-chat').addEventListener('click', async () => {
-    switchSidebarTab('btn-chat');
-    document.getElementById('chat-area').style.display = 'flex';
+if (document.getElementById('btn-new-chat')) {
+    document.getElementById('btn-new-chat').addEventListener('click', async () => {
+        switchSidebarTab('btn-chat');
+        document.getElementById('welcome').style.display = 'flex';
 
-    await fetch('/api/reset', { method: 'POST' });
-    messagesDiv.innerHTML = '';
-    welcome.classList.remove('hidden');
-    input.focus();
-});
+        await fetch('/api/reset', { method: 'POST' });
+        messagesDiv.innerHTML = '';
+        welcome.classList.remove('hidden');
+        input.focus();
+    });
+}
 
 /* Legacy button listeners removed */
 
@@ -996,19 +1042,6 @@ if (document.getElementById('jobs-refresh-btn')) {
 }
 
 /* ── Project Explorer Logic ────────────────────────────── */
-let rightSidebarOpen = false;
-
-if (document.getElementById('toggle-right-sidebar')) {
-    document.getElementById('toggle-right-sidebar').addEventListener('click', () => {
-        const rs = document.getElementById('right-sidebar');
-        if (!rs) return;
-        rs.classList.toggle('collapsed');
-        rightSidebarOpen = !rs.classList.contains('collapsed');
-        if (rightSidebarOpen) {
-            loadProjectFiles();
-        }
-    });
-}
 
 function renderFileTree(nodes, indent = 0) {
     if (!nodes || nodes.length === 0) return '';
@@ -1045,12 +1078,6 @@ async function loadProjectFiles() {
     const container = document.getElementById('right-sidebar-content');
     if (!container) return;
 
-    // Check if UI is collapsed to save bandwidth
-    const rs = document.getElementById('right-sidebar');
-    if (rs && rs.classList.contains('collapsed')) return;
-
-    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">Scanning...</div>';
-
     try {
         const res = await fetch('/api/project_files');
         const data = await res.json();
@@ -1086,16 +1113,22 @@ let currentActiveFilePath = null;
 if (editorCloseBtn) {
     editorCloseBtn.addEventListener('click', () => {
         fileEditorArea.style.display = 'none';
-        chatArea.style.display = 'block';
+
+        // Show welcome screen instead of messing with chat visibility
+        let welcomeEl = document.getElementById('welcome');
+        if (welcomeEl) welcomeEl.style.display = 'flex';
+
         currentActiveFilePath = null;
     });
 }
 
 if (editorApproveBtn) {
     editorApproveBtn.addEventListener('click', () => {
-        // Go back to chat
         fileEditorArea.style.display = 'none';
-        chatArea.style.display = 'block';
+
+        let welcomeEl = document.getElementById('welcome');
+        if (welcomeEl) welcomeEl.style.display = 'flex';
+
         currentActiveFilePath = null;
 
         // Auto-approve the plan
@@ -1149,9 +1182,11 @@ async function openFileViewer(path) {
     const btnChat = document.getElementById('btn-chat');
     if (btnChat && !btnChat.classList.contains('active')) {
         btnChat.click();
-    } else {
-        chatArea.style.display = 'flex';
     }
+
+    // Hide welcome, show editor
+    let welcomeEl = document.getElementById('welcome');
+    if (welcomeEl) welcomeEl.style.display = 'none';
 
     fileEditorArea.style.display = 'flex';
 
