@@ -59,6 +59,12 @@ def init_db():
             content      TEXT NOT NULL,
             timestamp    REAL NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS memories (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            key   TEXT UNIQUE NOT NULL,
+            value TEXT NOT NULL
+        );
     """)
     conn.commit()
     conn.close()
@@ -104,6 +110,36 @@ def save_settings(settings: dict):
         )
     conn.commit()
     conn.close()
+
+
+# ── Agent Memory ────────────────────────────────────────────
+def save_memory(key: str, value: str):
+    """Save a memory fact about the user."""
+    conn = _get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO memories (key, value) VALUES (?, ?)",
+        (key, value),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_memories() -> dict:
+    """Get all saved memory facts."""
+    conn = _get_conn()
+    rows = conn.execute("SELECT key, value FROM memories").fetchall()
+    conn.close()
+    return {row["key"]: row["value"] for row in rows}
+
+
+def delete_memory(key: str) -> bool:
+    """Delete a saved memory. Returns True if deleted."""
+    conn = _get_conn()
+    cursor = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+    conn.close()
+    return deleted
 
 
 # ── Chat History ────────────────────────────────────────────

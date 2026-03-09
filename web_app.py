@@ -67,7 +67,18 @@ def api_chat():
     if not user_msg:
         return jsonify({"error": "Empty message"}), 400
 
-    context_msg = f"[WORKING DIRECTORY]: {current_working_dir}\n\n{user_msg}"
+    context_msg = f"[WORKING DIRECTORY]: {current_working_dir}\n\n"
+    
+    # Inject Agent Memories
+    memories = db.get_memories()
+    if memories:
+        context_msg += "[USER MEMORIES & BACKGROUND]\n"
+        context_msg += "You MUST adhere to the following facts, preferences, and context established by the user in previous conversations:\n"
+        for k, v in memories.items():
+            context_msg += f"- {k}: {v}\n"
+        context_msg += "\n"
+
+    context_msg += user_msg
 
     # Save user message to DB
     db.save_chat_message(current_session_id, "user", user_msg)
