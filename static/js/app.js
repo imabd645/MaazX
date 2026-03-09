@@ -1072,63 +1072,120 @@ async function loadProjectFiles() {
     }
 }
 
-/* ── Direct File Viewer Modal ────────────────────────────── */
-const fileViewerModal = document.getElementById('file-viewer-modal');
-const fileViewerTitle = document.getElementById('file-viewer-title');
-const fileViewerContent = document.getElementById('file-viewer-content');
-const fileViewerLoading = document.getElementById('file-viewer-loading');
-const fileViewerClose = document.getElementById('file-viewer-close');
+/* ── Full-Pane File Editor ───────────────────────────── */
+const fileEditorArea = document.getElementById('file-editor-area');
+const editorFilename = document.getElementById('editor-filename');
+const editorTextarea = document.getElementById('editor-textarea');
+const editorLoading = document.getElementById('editor-loading');
+const editorCloseBtn = document.getElementById('editor-close-btn');
+const editorSaveBtn = document.getElementById('editor-save-btn');
+const editorApproveBtn = document.getElementById('editor-approve-btn');
 
-if (fileViewerClose) {
-    fileViewerClose.addEventListener('click', () => { fileViewerModal.style.display = 'none'; });
-    fileViewerModal.addEventListener('click', (e) => {
-        if (e.target === fileViewerModal) fileViewerModal.style.display = 'none';
+let currentActiveFilePath = null;
+
+if (editorCloseBtn) {
+    editorCloseBtn.addEventListener('click', () => {
+        fileEditorArea.style.display = 'none';
+        chatArea.style.display = 'block';
+        currentActiveFilePath = null;
+    });
+}
+
+if (editorApproveBtn) {
+    editorApproveBtn.addEventListener('click', () => {
+        // Go back to chat
+        fileEditorArea.style.display = 'none';
+        chatArea.style.display = 'block';
+        currentActiveFilePath = null;
+
+        // Auto-approve the plan
+        const input = document.getElementById('message-input');
+        input.value = "I approve the plan, please proceed. Enable auto-run for commands if necessary.";
+        document.getElementById('send-btn').click();
+    });
+}
+
+if (editorSaveBtn) {
+    editorSaveBtn.addEventListener('click', async () => {
+        if (!currentActiveFilePath) return;
+
+        const content = editorTextarea.value;
+        const originalText = editorSaveBtn.textContent;
+        editorSaveBtn.textContent = 'Saving...';
+        editorSaveBtn.disabled = true;
+
+        try {
+            const res = await fetch('/api/save_file', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: currentActiveFilePath, content: content })
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                alert(`Error saving file: ${data.error}`);
+            } else {
+                editorSaveBtn.textContent = 'Saved!';
+                editorSaveBtn.style.color = "var(--green)";
+            }
+        } catch (err) {
+            alert(`Network error saving file: ${err.message}`);
+        } finally {
+            setTimeout(() => {
+                editorSaveBtn.textContent = originalText;
+                editorSaveBtn.style.color = "";
+                editorSaveBtn.disabled = false;
+            }, 2000);
+        }
     });
 }
 
 async function openFileViewer(path) {
-    if (!fileViewerModal) return;
+    if (!fileEditorArea) return;
 
-    // Extract filename for title
+    currentActiveFilePath = path;
+
+    // Switch to Chat Tab if we are elsewhere (Settings/Jobs)
+    const btnChat = document.getElementById('btn-chat');
+    if (btnChat && !btnChat.classList.contains('active')) {
+        btnChat.click();
+    } else {
+        chatArea.style.display = 'flex';
+    }
+
+    fileEditorArea.style.display = 'flex';
+
+    // Extract filename for header
     const filename = path.split(/[/\\]/).filter(Boolean).pop() || path;
-    fileViewerTitle.textContent = filename;
-    fileViewerTitle.title = path; // Tooltip for full path
+    editorFilename.textContent = filename;
+    editorFilename.title = path; // Tooltip for full path
 
-    fileViewerContent.textContent = '';
-    fileViewerContent.style.display = 'none';
-    fileViewerLoading.style.display = 'block';
-    fileViewerLoading.textContent = 'Fetching file...';
-    fileViewerModal.style.display = 'flex';
+    // Show "Approve Plan" button if reading an implementation plan
+    if (filename.toLowerCase() === 'implementation_plan.md') {
+        editorApproveBtn.style.display = 'inline-flex';
+    } else {
+        editorApproveBtn.style.display = 'none';
+    }
+
+    editorTextarea.value = '';
+    editorTextarea.style.display = 'none';
+    editorLoading.style.display = 'block';
+    editorLoading.textContent = 'Fetching file...';
 
     try {
         const res = await fetch(`/api/file_content?path=${encodeURIComponent(path)}`);
         const data = await res.json();
 
         if (data.error) {
-            fileViewerLoading.textContent = `Error: ${data.error}`;
+            editorLoading.textContent = `Error: ${data.error}`;
             return;
         }
 
-        fileViewerLoading.style.display = 'none';
-        fileViewerContent.style.display = 'block';
-
-        // Render raw text
-        fileViewerContent.textContent = data.content;
-
-        // Apply Highlight.js syntax highlighting
-        if (window.hljs) {
-            // Remove previous language classes to let hljs auto-detect
-            fileViewerContent.className = '';
-            fileViewerContent.style.padding = '20px';
-            fileViewerContent.style.fontFamily = 'var(--font-mono)';
-            fileViewerContent.style.fontSize = '13px';
-            fileViewerContent.style.lineHeight = '1.5';
-            hljs.highlightElement(fileViewerContent);
-        }
+        editorLoading.style.display = 'none';
+        editorTextarea.style.display = 'block';
+        editorTextarea.value = data.content;
 
     } catch (err) {
-        fileViewerLoading.textContent = `Network Error: ${err.message}`;
+        editorLoading.textContent = `Network Error: ${err.message}`;
     }
 }
-
-

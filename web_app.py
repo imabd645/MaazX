@@ -294,6 +294,36 @@ def api_file_content():
         return jsonify({"error": f"Error reading file: {str(e)}"}), 500
 
 
+@app.route("/api/save_file", methods=["PUT"])
+def api_save_file():
+    """Saves edited content back to the file system."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON payload"}), 400
+        
+    file_path = data.get("path")
+    content = data.get("content")
+    
+    if not file_path:
+        return jsonify({"error": "No path provided"}), 400
+        
+    if content is None:
+        return jsonify({"error": "No content provided"}), 400
+        
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+        
+    if os.path.isdir(file_path):
+        return jsonify({"error": "Cannot write to a directory"}), 400
+        
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return jsonify({"success": True, "message": "File saved successfully"})
+    except Exception as e:
+        return jsonify({"error": f"Error saving file: {str(e)}"}), 500
+
+
 # ── Terminal ────────────────────────────────────────────────
 @app.route("/api/terminal", methods=["POST"])
 def api_terminal():
