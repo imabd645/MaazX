@@ -67,7 +67,13 @@ def api_chat():
     if not user_msg:
         return jsonify({"error": "Empty message"}), 400
 
-    context_msg = f"[WORKING DIRECTORY]: {current_working_dir}\n\n"
+    # ── Intent Classifier ───────────────────────────────────
+    from core.intent_classifier import classify_intent
+    intent = classify_intent(user_msg)
+    
+    print(f"\n[INTENT CLASSIFIER] Message: '{user_msg}' => Intent: {intent}")
+    
+    context_msg = f"[CLASSIFIED INTENT: {intent}]\n[WORKING DIRECTORY]: {current_working_dir}\n\n"
     
     # Inject Agent Memories
     memories = db.get_memories()
@@ -96,7 +102,12 @@ def api_chat():
         try:
             # Add system message if first message
             msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + openrouter_messages
-            tool_defs = openrouter_client.build_tool_definitions()
+            
+            # Disable tools if intent is pure conversational
+            if intent == "chat":
+                tool_defs = []
+            else:
+                tool_defs = openrouter_client.build_tool_definitions()
 
             result = openrouter_client.chat_completion(api_key, current_model, msgs, tool_defs)
 
@@ -127,8 +138,14 @@ def api_chat():
             return jsonify({"error": str(e)}), 500
 
     # ── Gemini path ─────────────────────────────────────────
+    # If the intent is purely conversational, completely disable tool calling to prevent hallucination
+    if intent == "chat":
+        mode_val = "none"
+    else:
+        mode_val = app_settings.get("tool_mode", "any")
+
     current_tool_cfg = content_types.to_tool_config(
-        {"function_calling_config": {"mode": app_settings.get("tool_mode", "any")}}
+        {"function_calling_config": {"mode": mode_val}}
     )
 
     try:

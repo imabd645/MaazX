@@ -42,9 +42,14 @@ def handle_incoming_message(msg_data: dict):
     settings = database.load_settings()
     model_name = settings.get("model_name", "gemini-2.5-flash")
     owner_name = settings.get("wa_owner_name", "User")
+    
+    # Run Intent Classifier
+    from core.intent_classifier import classify_intent
+    intent = classify_intent(body)
 
     # 3. Build the System Prompt
     system_prompt = f"""
+    [CLASSIFIED INTENT: {intent}]
     You are an AI assistant managing WhatsApp messages on behalf of {owner_name}.
     You are currently talking to: {contact_name} ({sender}).
     

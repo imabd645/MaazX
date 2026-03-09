@@ -1263,3 +1263,96 @@ async function openFileViewer(path) {
         editorLoading.textContent = `Network Error: ${err.message}`;
     }
 }
+
+// ── Knowledge Base ─────────────────────────────────────────
+
+async function loadKnowledgeBase() {
+    const container = document.getElementById('kb-list-container');
+    if (!container) return;
+
+    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">Loading documents...</div>';
+
+    try {
+        const res = await fetch('/api/knowledge/list');
+        const data = await res.json();
+
+        container.innerHTML = '';
+        if (!data.files || data.files.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">No documents uploaded yet.</div>';
+            return;
+        }
+
+        data.files.forEach(file => {
+            const sizeKB = (file.size / 1024).toFixed(1);
+            const div = document.createElement('div');
+            div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background:var(--bg-tertiary); padding: 15px; border-radius:8px; border:1px solid var(--border);';
+            div.innerHTML = `
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-weight:600; color:var(--text-primary); font-size:14px;">${file.filename}</span>
+                    <span style="font-size:12px; color:var(--text-muted); margin-top:4px;">${sizeKB} KB</span>
+                </div>
+                <button class="quick-btn" onclick="deleteKnowledgeDoc('${file.filename}')" style="color:#f85149; border-color:transparent; padding:6px 10px;" title="Delete Document">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    } catch (err) {
+        container.innerHTML = `<div style="color:#f85149; padding: 20px;">Failed to load documents: ${err.message}</div>`;
+    }
+}
+
+// Attach to window so onclick can find it
+window.deleteKnowledgeDoc = async function (filename) {
+    if (!confirm(`Are you sure you want to delete ${filename} from the AI Knowledge Base?`)) return;
+
+    try {
+        const res = await fetch('/api/knowledge/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        loadKnowledgeBase();
+    } catch (err) {
+        alert('Failed to delete document: ' + err.message);
+    }
+};
+
+const kbUploadBtn = document.getElementById('kb-upload-btn');
+const kbFileInput = document.getElementById('kb-file-input');
+if (kbUploadBtn && kbFileInput) {
+    kbUploadBtn.addEventListener('click', () => kbFileInput.click());
+
+    kbFileInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const originalText = kbUploadBtn.textContent;
+        kbUploadBtn.textContent = 'Uploading...';
+        kbUploadBtn.disabled = true;
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('file', files[i]);
+
+                const res = await fetch('/api/knowledge/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.error || 'Upload failed');
+            }
+            loadKnowledgeBase();
+        } catch (err) {
+            alert('Upload error: ' + err.message);
+        } finally {
+            kbUploadBtn.textContent = originalText;
+            kbUploadBtn.disabled = false;
+            kbFileInput.value = ''; // Reset input
+        }
+    });
+}
