@@ -228,6 +228,72 @@ def api_browse():
         return jsonify({"error": "Permission denied"}), 403
 
 
+@app.route("/api/project_files", methods=["GET"])
+def api_project_files():
+    """Recursively scans the current working directory to build a file tree for the Right Sidebar."""
+    def build_tree(dir_path, depth=0, max_depth=5):
+        if depth > max_depth:
+            return []
+            
+        tree = []
+        try:
+            entries = sorted(os.listdir(dir_path))
+            for e in entries:
+                if e in ['.git', '__pycache__', 'node_modules', '.venv', 'venv'] or e.startswith('.'):
+                    continue
+                    
+                full_path = os.path.join(dir_path, e)
+                is_dir = os.path.isdir(full_path)
+                
+                node = {
+                    "name": e,
+                    "path": full_path,
+                    "is_dir": is_dir,
+                    "children": build_tree(full_path, depth + 1, max_depth) if is_dir else []
+                }
+                tree.append(node)
+        except PermissionError:
+            pass
+            
+        return tree
+        
+    try:
+        if not current_working_dir or not os.path.exists(current_working_dir):
+            return jsonify({"tree": [], "cwd": ""})
+            
+        tree = build_tree(current_working_dir)
+        return jsonify({"tree": tree, "cwd": current_working_dir})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/file_content", methods=["GET"])
+def api_file_content():
+    """Reads a file and returns its textual content for the frontend File Viewer."""
+    file_path = request.args.get("path")
+    if not file_path:
+        return jsonify({"error": "No path provided"}), 400
+        
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+        
+    if os.path.isdir(file_path):
+        return jsonify({"error": "Cannot read a directory"}), 400
+        
+    try:
+        # Check size to prevent locking up the browser
+        if os.path.getsize(file_path) > 1024 * 1024 * 5: # 5MB limit
+            return jsonify({"error": "File is too large (> 5MB) to view in browser"}), 400
+            
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return jsonify({"content": content, "path": file_path})
+    except UnicodeDecodeError:
+        return jsonify({"error": "Cannot read binary file contents"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Error reading file: {str(e)}"}), 500
+
+
 # ── Terminal ────────────────────────────────────────────────
 @app.route("/api/terminal", methods=["POST"])
 def api_terminal():
