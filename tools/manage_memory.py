@@ -5,7 +5,7 @@ Agent tool to save, recall, and delete long-term memory facts.
 from core.tool_registry import register_tool
 import database as db
 
-@register_tool("remember_fact", "Save a persistent memory or preference about the user.")
+@register_tool
 def remember_fact(key: str, value: str) -> str:
     """
     Saves a persistent memory or preference about the user into the SQLite database.
@@ -19,7 +19,7 @@ def remember_fact(key: str, value: str) -> str:
     return f"Memory saved successfully! I will remember that '{key}' is: {value}"
 
 
-@register_tool("forget_fact", "Delete a saved persistent memory.")
+@register_tool
 def forget_fact(key: str) -> str:
     """
     Deletes a specific memory from the database.
@@ -34,7 +34,7 @@ def forget_fact(key: str) -> str:
         return f"No memory found with the key '{key}'."
 
 
-@register_tool("list_memories", "List all currently saved long-term memories.")
+@register_tool
 def list_memories() -> str:
     """
     Lists all saved user memories and preferences from the database.
