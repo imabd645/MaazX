@@ -29,7 +29,7 @@ app_settings = db.load_settings()
 
 # Session tracking
 current_session_id = str(uuid.uuid4())[:8]
-current_working_dir = os.getcwd()
+current_working_dir = app_settings.get("cwd", os.getcwd())
 
 # OpenRouter message history (for non-Gemini models)
 openrouter_messages = []
@@ -204,6 +204,7 @@ def api_set_cwd():
     if not os.path.isdir(new_dir):
         return jsonify({"error": f"'{new_dir}' is not a valid directory"}), 400
     current_working_dir = os.path.abspath(new_dir)
+    db.save_settings({"cwd": current_working_dir})
     return jsonify({"cwd": current_working_dir})
 
 
