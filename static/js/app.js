@@ -136,6 +136,44 @@ if (document.getElementById('btn-new-chat')) {
 
 /* Legacy button listeners removed */
 
+/* Sidebar Navigation Pane Manager */
+function showCenterPane(paneId) {
+    const panes = ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'knowledge-area'];
+    panes.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === paneId) ? 'flex' : 'none';
+    });
+    document.getElementById('welcome').style.display = 'none';
+}
+
+if (document.getElementById('btn-settings')) {
+    document.getElementById('btn-settings').addEventListener('click', () => {
+        showCenterPane('settings-area');
+        loadSettings();
+    });
+}
+
+if (document.getElementById('btn-jobs')) {
+    document.getElementById('btn-jobs').addEventListener('click', () => {
+        showCenterPane('jobs-area');
+        loadJobs();
+    });
+}
+
+if (document.getElementById('btn-wa-view')) {
+    document.getElementById('btn-wa-view').addEventListener('click', () => {
+        showCenterPane('whatsapp-area');
+        loadWhatsAppContacts();
+    });
+}
+
+if (document.getElementById('btn-knowledge')) {
+    document.getElementById('btn-knowledge').addEventListener('click', () => {
+        showCenterPane('knowledge-area');
+        loadKnowledgeBase();
+    });
+}
+
 /* WhatsApp Logout */
 if (document.getElementById('wa-logout-btn')) {
     document.getElementById('wa-logout-btn').addEventListener('click', async () => {
@@ -231,6 +269,7 @@ function appendMessage(role, text, toolCalls = []) {
     div.className = `message ${role}`;
 
     const isUser = role === 'user';
+
     const avatarClass = isUser ? 'user-av' : 'agent-av';
     const nameClass = isUser ? 'user-name' : 'agent-name';
     const avatarText = isUser ? 'U' : 'A';

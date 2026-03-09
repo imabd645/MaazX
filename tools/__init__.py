@@ -33,3 +33,4 @@ import tools.inspect_database
 
 # Agent Memory
 import tools.manage_memory
+import tools.query_knowledge

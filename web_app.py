@@ -393,6 +393,75 @@ def api_indexing_status():
     """Get the current RAG indexing progress."""
     return jsonify(indexer.get_indexing_status())
 
+# ── Knowledge Base (PDFs/Docs) ──────────────────────────────
+from core import knowledge_indexer
+
+# Make sure a folder exists for uploaded KB documents
+KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")
+os.makedirs(KNOWLEDGE_DIR, exist_ok=True)
+
+@app.route("/api/knowledge/upload", methods=["POST"])
+def api_upload_knowledge():
+    """Upload a document and index it into the Knowledge base."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+        
+    filepath = os.path.join(KNOWLEDGE_DIR, file.filename)
+    try:
+        file.save(filepath)
+        # Synchronously index the document right after upload
+        result = knowledge_indexer.index_document(filepath)
+        if result.get("status") == "error":
+            # If indexing failed, we probably don't want to keep the bad file
+            try: os.remove(filepath)
+            except: pass
+            return jsonify(result), 400
+            
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/knowledge/list", methods=["GET"])
+def api_list_knowledge():
+    """List all files available in the Knowledge base."""
+    if not os.path.exists(KNOWLEDGE_DIR):
+        return jsonify({"files": []})
+    
+    files = []
+    for f in os.listdir(KNOWLEDGE_DIR):
+        path = os.path.join(KNOWLEDGE_DIR, f)
+        if os.path.isfile(path):
+            files.append({
+                "filename": f,
+                "size": os.path.getsize(path)
+            })
+    return jsonify({"files": files})
+
+@app.route("/api/knowledge/delete", methods=["POST"])
+def api_delete_knowledge():
+    """Delete a document from disk and the knowledge vector index."""
+    data = request.json
+    filename = data.get("filename")
+    if not filename:
+        return jsonify({"error": "Filename required"}), 400
+        
+    filepath = os.path.join(KNOWLEDGE_DIR, filename)
+    try:
+        # 1. Remove from vector DB
+        knowledge_indexer.delete_document(filename)
+        
+        # 2. Remove from OS
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return jsonify({"status": "success", "msg": f"Deleted {filename}"})
+        else:
+            return jsonify({"status": "error", "error": "File not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
 # ── Git / Undo ──────────────────────────────────────────────
 from core import git_backup
 
