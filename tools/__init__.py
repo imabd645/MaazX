@@ -30,3 +30,6 @@ import tools.schedule_action
 
 # Data Inspection
 import tools.inspect_database
+
+# Agent Memory
+import tools.manage_memory
