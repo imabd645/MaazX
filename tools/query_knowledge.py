@@ -6,7 +6,7 @@ Allows the AI to find answers within uploaded PDFs, Word Docs, and text files.
 from core.tool_registry import register_tool
 from core import knowledge_indexer
 
-@register_tool("query_knowledge", "Search through uploaded company documents, PDFs, and text files for semantic matches.")
+@register_tool
 def query_knowledge(query: str, max_results: int = 5) -> str:
     """
     Search the Knowledge Base for context that matches the *meaning* of the query.
