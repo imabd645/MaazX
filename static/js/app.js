@@ -326,6 +326,7 @@ const modalClose = document.getElementById('modal-close');
         const data = await res.json();
         cwdPathEl.textContent = data.cwd;
         dirInput.value = data.cwd;
+        loadProjectFiles(); // Also load the right sidebar file tree
     } catch { /* ignore */ }
 })();
 
@@ -367,6 +368,7 @@ async function setCwd(path) {
         cwdPathEl.textContent = data.cwd;
         dirInput.value = data.cwd;
         closeModal();
+        loadProjectFiles(); // Refresh the right sidebar
     } catch (err) {
         alert('Error setting directory: ' + err.message);
     }
@@ -992,3 +994,141 @@ window.deleteJob = async function (jobId) {
 if (document.getElementById('jobs-refresh-btn')) {
     document.getElementById('jobs-refresh-btn').addEventListener('click', loadJobs);
 }
+
+/* ── Project Explorer Logic ────────────────────────────── */
+let rightSidebarOpen = false;
+
+if (document.getElementById('toggle-right-sidebar')) {
+    document.getElementById('toggle-right-sidebar').addEventListener('click', () => {
+        const rs = document.getElementById('right-sidebar');
+        if (!rs) return;
+        rs.classList.toggle('collapsed');
+        rightSidebarOpen = !rs.classList.contains('collapsed');
+        if (rightSidebarOpen) {
+            loadProjectFiles();
+        }
+    });
+}
+
+function renderFileTree(nodes, indent = 0) {
+    if (!nodes || nodes.length === 0) return '';
+    let html = '';
+    nodes.forEach(node => {
+        const pad = indent * 15;
+        const icon = node.is_dir ? '&#128193;' : '&#128196;';
+
+        // Properly escape for JS string injection
+        const safePath = node.path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        if (node.is_dir) {
+            html += `<div class="file-tree-item" style="padding-left: ${pad + 10}px;" title="${escapeHtml(node.path)}">
+                <span class="file-tree-icon">${icon}</span>
+                <span>${escapeHtml(node.name)}</span>
+            </div>`;
+        } else {
+            // If it's a file, open the Direct File Viewer modal
+            html += `<div class="file-tree-item" style="padding-left: ${pad + 10}px;" title="${escapeHtml(node.path)}" 
+                onclick="openFileViewer('${safePath}')">
+                <span class="file-tree-icon">${icon}</span>
+                <span>${escapeHtml(node.name)}</span>
+            </div>`;
+        }
+
+        if (node.is_dir && node.children && node.children.length > 0) {
+            html += renderFileTree(node.children, indent + 1);
+        }
+    });
+    return html;
+}
+
+async function loadProjectFiles() {
+    const container = document.getElementById('right-sidebar-content');
+    if (!container) return;
+
+    // Check if UI is collapsed to save bandwidth
+    const rs = document.getElementById('right-sidebar');
+    if (rs && rs.classList.contains('collapsed')) return;
+
+    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">Scanning...</div>';
+
+    try {
+        const res = await fetch('/api/project_files');
+        const data = await res.json();
+
+        if (data.error) {
+            container.innerHTML = `<div style="color:red; padding: 10px; font-size:12px;">Error: ${escapeHtml(data.error)}</div>`;
+            return;
+        }
+
+        if (!data.tree || data.tree.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px; font-size:13px;">No files found or directory is empty.</div>';
+            return;
+        }
+
+        container.innerHTML = renderFileTree(data.tree);
+
+    } catch (err) {
+        container.innerHTML = `<div style="color:red; padding: 10px; font-size:12px;">Failed to load project files: ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+/* ── Direct File Viewer Modal ────────────────────────────── */
+const fileViewerModal = document.getElementById('file-viewer-modal');
+const fileViewerTitle = document.getElementById('file-viewer-title');
+const fileViewerContent = document.getElementById('file-viewer-content');
+const fileViewerLoading = document.getElementById('file-viewer-loading');
+const fileViewerClose = document.getElementById('file-viewer-close');
+
+if (fileViewerClose) {
+    fileViewerClose.addEventListener('click', () => { fileViewerModal.style.display = 'none'; });
+    fileViewerModal.addEventListener('click', (e) => {
+        if (e.target === fileViewerModal) fileViewerModal.style.display = 'none';
+    });
+}
+
+async function openFileViewer(path) {
+    if (!fileViewerModal) return;
+
+    // Extract filename for title
+    const filename = path.split(/[/\\]/).filter(Boolean).pop() || path;
+    fileViewerTitle.textContent = filename;
+    fileViewerTitle.title = path; // Tooltip for full path
+
+    fileViewerContent.textContent = '';
+    fileViewerContent.style.display = 'none';
+    fileViewerLoading.style.display = 'block';
+    fileViewerLoading.textContent = 'Fetching file...';
+    fileViewerModal.style.display = 'flex';
+
+    try {
+        const res = await fetch(`/api/file_content?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+
+        if (data.error) {
+            fileViewerLoading.textContent = `Error: ${data.error}`;
+            return;
+        }
+
+        fileViewerLoading.style.display = 'none';
+        fileViewerContent.style.display = 'block';
+
+        // Render raw text
+        fileViewerContent.textContent = data.content;
+
+        // Apply Highlight.js syntax highlighting
+        if (window.hljs) {
+            // Remove previous language classes to let hljs auto-detect
+            fileViewerContent.className = '';
+            fileViewerContent.style.padding = '20px';
+            fileViewerContent.style.fontFamily = 'var(--font-mono)';
+            fileViewerContent.style.fontSize = '13px';
+            fileViewerContent.style.lineHeight = '1.5';
+            hljs.highlightElement(fileViewerContent);
+        }
+
+    } catch (err) {
+        fileViewerLoading.textContent = `Network Error: ${err.message}`;
+    }
+}
+
+
