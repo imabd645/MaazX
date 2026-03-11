@@ -71,9 +71,14 @@ def extract_text_from_file(filepath: str) -> str:
 
 def index_document(filepath: str) -> dict:
     """Read a document, embed it, and store it in Chroma."""
-    from config import GEMINI_API_KEY
-    if not GEMINI_API_KEY:
-        return {"status": "error", "error": "GEMINI_API_KEY config not found."}
+    import database as db
+    settings = db.load_settings()
+    api_key = settings.get("gemini_api_key") or config.GEMINI_API_KEY
+    if not api_key:
+        return {"status": "error", "error": "Gemini API Key for embeddings not found. Set it in Settings."}
+
+    # Ensure genai is configured with the correct key for this thread
+    genai.configure(api_key=api_key)
 
     content = extract_text_from_file(filepath)
     if not content.strip() or content.startswith("Error") or content.startswith("Warning"):
@@ -137,6 +142,12 @@ def delete_document(filename: str) -> bool:
 def query_knowledge(query: str, n_results: int = 5) -> list:
     """Search the knowledge database based on a text query."""
     try:
+        import database as db
+        settings = db.load_settings()
+        api_key = settings.get("gemini_api_key") or config.GEMINI_API_KEY
+        if api_key:
+            genai.configure(api_key=api_key)
+
         result = genai.embed_content(
             model="models/gemini-embedding-001",
             content=query,
