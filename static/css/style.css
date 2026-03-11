@@ -434,6 +434,7 @@ body {
     font-weight: 700;
     background: linear-gradient(135deg, var(--text-primary), var(--accent-light));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
@@ -1592,6 +1593,7 @@ body {
 #health-log-content::-webkit-scrollbar {
     width: 4px;
 }
+
 /* Chat History */
 .history-card {
     background: var(--bg-secondary);
@@ -1651,3 +1653,71 @@ body {
     background: rgba(255, 68, 68, 0.1);
 }
 
+/* ── Sidebar Footer & Navigation ────────────────────────── */
+.sidebar-footer {
+    padding: 15px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.nav-icon-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.nav-btn {
+    flex: 1;
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+    margin: 0;
+}
+
+.nav-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.nav-btn.active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent-light);
+}
+
+.new-chat-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.new-chat-btn:hover {
+    background: var(--accent-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
