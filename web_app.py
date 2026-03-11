@@ -36,8 +36,79 @@ current_working_dir = app_settings.get("cwd", os.getcwd())
 # In-memory message history for DeepSeek/OpenRouter
 session_messages = []
 
+import time
+import requests
+
 def _is_openrouter_model(model_name: str) -> bool:
     return model_name in openrouter_client.OPENROUTER_MODELS
+
+# ── Health & Self-Healing ───────────────────────────────────
+@app.route("/api/health", methods=["GET"])
+def api_get_health():
+    """Checks the status of all core services."""
+    results = {
+        "gemini": "offline",
+        "deepseek": "offline",
+        "bridge": "offline"
+    }
+    
+    # 1. Check Gemini
+    try:
+        if genai_key:
+            # Simple list-models call to verify key
+            from google.generativeai import list_models
+            list_models() # Trigerrs error if key is invalid
+            results["gemini"] = "online"
+        else:
+            results["gemini"] = "missing key"
+    except Exception as e:
+        results["gemini"] = f"error: {str(e)}"
+
+    # 2. Check DeepSeek
+    ds_key = app_settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
+    if ds_key:
+        try:
+            from core.deepseek_client import DEEPSEEK_BASE_URL
+            res = requests.get(f"{DEEPSEEK_BASE_URL}/models", headers={"Authorization": f"Bearer {ds_key}"}, timeout=5)
+            if res.ok: results["deepseek"] = "online"
+            else: results["deepseek"] = f"api error: {res.status_code}"
+        except Exception as e:
+            results["deepseek"] = f"error: {str(e)}"
+    else:
+        results["deepseek"] = "missing key"
+    
+    # 3. Check Bridge
+    try:
+        res = requests.get("http://127.0.0.1:3000/status", timeout=2)
+        if res.ok:
+            data = res.json()
+            results["bridge"] = data.get("status", "online")
+        else:
+            results["bridge"] = "offline (bridge error)"
+    except:
+        results["bridge"] = "offline"
+
+    return jsonify(results)
+
+@app.route("/api/restart_bridge", methods=["POST"])
+def api_restart_bridge():
+    """Kills existing node bridge and restarts it."""
+    try:
+        # 1. Kill any existing nodes running index.js (Windows specific)
+        if os.name == "nt":
+            subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True)
+        else:
+            subprocess.run('pkill node', shell=True, capture_output=True)
+        
+        time.sleep(1) # wait for release
+        
+        # 2. Spawn new process
+        bridge_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_bridge")
+        subprocess.Popen(['node', 'index.js'], cwd=bridge_dir, shell=True)
+        
+        return jsonify({"success": True, "message": "Bridge restart initiated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Routes ──────────────────────────────────────────────────
