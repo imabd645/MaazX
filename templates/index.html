@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Coding Agent</title>
+    <title>DeepSeek Coding Agent</title>
     <meta name="description" content="AI-powered coding assistant with file management and codebase scanning">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
@@ -23,7 +23,7 @@
         <div class="sidebar-header">
             <div class="logo">
                 <div class="logo-icon">&#9889;</div>
-                <span class="logo-text">Gemini Agent</span>
+                <span class="logo-text">DeepSeek Agent</span>
             </div>
         </div>
 
@@ -262,6 +262,10 @@
                                 <div class="setting-group" style="margin-top:15px;">
                                     <label class="setting-label">Model</label>
                                     <select class="setting-select" id="setting-model">
+                                        <optgroup label="DeepSeek (Official API)">
+                                            <option value="deepseek-chat" selected>DeepSeek Chat (V3)</option>
+                                            <option value="deepseek-coder">DeepSeek Coder</option>
+                                        </optgroup>
                                         <optgroup label="Gemini (Google AI)">
                                             <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                                             <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
@@ -485,7 +489,7 @@
                 <div class="welcome" id="welcome"
                     style="margin: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                     <div class="welcome-icon">&#9889;</div>
-                    <h1>Gemini Coding Agent</h1>
+                    <h1>DeepSeek Coding Agent</h1>
                     <p>I can scan codebases, search files, edit code, and run commands.<br>Select a working directory in
                         the
                         sidebar to get started.</p>
@@ -525,7 +529,8 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="input-hint" style="text-align: center; margin-top: 8px;">Gemini Agent can make mistakes.
+                    <div class="input-hint" style="text-align: center; margin-top: 8px;">DeepSeek Agent can make
+                        mistakes.
                     </div>
                 </div>
             </div> <!-- End Right Pane -->

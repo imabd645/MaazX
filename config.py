@@ -1,15 +1,24 @@
 """
-Centralized configuration for the Gemini File Agent.
+Centralized configuration for the DeepSeek File Agent.
 Add new settings here as the agent grows.
 """
 
 import os
 import sys
+from dotenv import dotenv_values
 
-# ── Gemini API ──────────────────────────────────────────────
-GEMINI_API_KEY = "AIzaSyAT0HwXm-g-Ci5mpvnnO5fCLhBKlLAvroI"
+# Load secrets from agent_secrets.env without polluting os.environ
+secrets = dotenv_values("agent_secrets.env")
 
-MODEL_NAME = "gemini-2.5-flash"
+# ── API Keys & Model Selection ───────────────────────────────
+GEMINI_API_KEY = secrets.get("ANTIGRAVITY_GEMINI_API_KEY", "").strip()
+DEEPSEEK_API_KEY = secrets.get("ANTIGRAVITY_DEEPSEEK_API_KEY", "").strip()
+
+# Primary model name
+MODEL_NAME = "deepseek-chat"
+
+# WhatsApp Admin Configuration
+WHATSAPP_ADMIN_NUMBERS = ["923350806140@c.us"] # Add admin numbers here
 
 SYSTEM_INSTRUCTION = """You are an expert AI coding assistant — similar to Cursor or an AI pair programmer.
 You operate inside the user's codebase and can read, create, edit, search files, and run shell commands.
@@ -120,8 +129,19 @@ Follow this structured workflow:
 # ── Helpers ─────────────────────────────────────────────────
 def validate():
     """Exit early with a helpful message if config is invalid."""
+    missing = []
     if not GEMINI_API_KEY:
-        print("Error: GEMINI_API_KEY environment variable is not set.")
+        missing.append("GEMINI_API_KEY")
+    if MODEL_NAME.startswith("deepseek") and not DEEPSEEK_API_KEY:
+        missing.append("DEEPSEEK_API_KEY")
+
+    if missing:
+        print("Error: required environment variables are not set:")
+        for name in missing:
+            print(f"  - {name}")
+        print("\nSet them before starting the agent, for example:")
         print("  Windows (PS):  $env:GEMINI_API_KEY='your_key'")
-        print("  Linux/Mac:     export GEMINI_API_KEY=your_key")
+        print("                  $env:DEEPSEEK_API_KEY='your_key'")
+        print("  Linux/Mac:     export GEMINI_API_KEY='your_key'")
+        print("                  export DEEPSEEK_API_KEY='your_key'")
         sys.exit(1)
