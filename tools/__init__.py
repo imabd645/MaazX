@@ -35,3 +35,6 @@ import tools.inspect_database
 import tools.whatsapp_admin
 import tools.manage_memory
 import tools.query_knowledge
+
+# Gmail Integration
+import tools.gmail
