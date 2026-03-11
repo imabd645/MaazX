@@ -57,6 +57,9 @@ def init_db():
             phone_number TEXT NOT NULL,
             role         TEXT NOT NULL,
             content      TEXT NOT NULL,
+            tool_calls   TEXT DEFAULT '[]',
+            tool_call_id TEXT,
+            name         TEXT,
             timestamp    REAL NOT NULL
         );
 
@@ -250,11 +253,11 @@ def delete_wa_contact(phone_number: str):
     conn.commit()
     conn.close()
 
-def save_wa_message(phone_number: str, role: str, content: str):
+def save_wa_message(phone_number: str, role: str, content: str, tool_calls: list = None, tool_call_id: str = None, name: str = None):
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO whatsapp_messages (phone_number, role, content, timestamp) VALUES (?, ?, ?, ?)",
-        (phone_number, role, content, time.time())
+        "INSERT INTO whatsapp_messages (phone_number, role, content, tool_calls, tool_call_id, name, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (phone_number, role, content, json.dumps(tool_calls or []), tool_call_id, name, time.time())
     )
     conn.commit()
     conn.close()
@@ -264,13 +267,27 @@ def get_wa_history(phone_number: str, limit: int = 40):
     conn = _get_conn()
     # Get latest messages first (DESC) then reverse them for the LLM (ASC order)
     rows = conn.execute(
-        "SELECT role, content, timestamp FROM whatsapp_messages WHERE phone_number = ? ORDER BY id DESC LIMIT ?",
+        "SELECT role, content, tool_calls, tool_call_id, name, timestamp FROM whatsapp_messages WHERE phone_number = ? ORDER BY id DESC LIMIT ?",
         (phone_number, limit)
     ).fetchall()
     conn.close()
     
     # Reverse so they are in chronological order: [oldest, ..., newest]
-    return [dict(row) for row in reversed(rows)]
+    history = []
+    for row in reversed(rows):
+        msg = {
+            "role": row["role"],
+            "content": row["content"],
+            "timestamp": row["timestamp"]
+        }
+        if row["tool_calls"]:
+            msg["tool_calls"] = json.loads(row["tool_calls"])
+        if row["tool_call_id"]:
+            msg["tool_call_id"] = row["tool_call_id"]
+        if row["name"]:
+            msg["name"] = row["name"]
+        history.append(msg)
+    return history
 
 def clear_wa_history(phone_number: str = None):
     conn = _get_conn()
