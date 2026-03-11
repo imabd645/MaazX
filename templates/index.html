@@ -253,6 +253,14 @@
                                     <input type="number" class="setting-input" id="setting-timeout" value="60" min="5"
                                         max="300">
                                 </div>
+
+                                <div class="setting-group" style="margin-top: 15px;">
+                                    <label class="setting-label">WhatsApp Admin Numbers</label>
+                                    <input type="text" class="setting-input" id="setting-wa-admins"
+                                        placeholder="923350806140@c.us, ...">
+                                    <span class="setting-hint">Comma-separated list of WhatsApp IDs (e.g.
+                                        92335...0@c.us)</span>
+                                </div>
                             </div>
 
                             <!-- Column 2: Models & Storage -->
@@ -284,6 +292,20 @@
                                     <input type="password" class="setting-input" id="setting-openrouter-key"
                                         placeholder="sk-or-...">
                                     <span class="setting-hint">Required for Gemma and other OpenRouter models</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">DeepSeek API Key</label>
+                                    <input type="password" class="setting-input" id="setting-deepseek-key"
+                                        placeholder="sk-...">
+                                    <span class="setting-hint">Overrides .env/config if set</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">Gemini API Key</label>
+                                    <input type="password" class="setting-input" id="setting-gemini-key"
+                                        placeholder="AIza...">
+                                    <span class="setting-hint">Overrides .env/config if set</span>
                                 </div>
 
                                 <div class="setting-group"
