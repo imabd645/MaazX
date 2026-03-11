@@ -76,6 +76,7 @@ def handle_incoming_message(msg_data: dict):
         4. Confirm actions briefly AFTER the tool has returned a result.
         5. CRITICAL: Do NOT use markdown formatting (no **, no *, no _). Use plain text or simple caps for headers.
         """
+        permitted_tools = None # Admin gets everything
     else:
         system_prompt = f"""
         [USER MODE]
@@ -83,11 +84,17 @@ def handle_incoming_message(msg_data: dict):
         You are talking to: {contact_name} ({sender}).
         Rules: {rules}
         
+        POWERS:
+        - You have access to Web Search tools to answer questions.
+        
         INSTRUCTIONS:
         - Be concise and natural.
-        - You DO NOT have system tools for this user. Just chat.
+        - Use 'search_web' and 'read_webpage' if the user asks for information you don't have.
         - CRITICAL: Do NOT use markdown formatting (no **, no *, no _).
         """
+        permitted_tools = ["search_web", "read_webpage"]
+        # Force intent to task if they ask a question that needs search? 
+        # Actually, allow_tools will be True below.
 
     reply_text = "I'm sorry, I encountered an error processing your message."
 
@@ -104,7 +111,8 @@ def handle_incoming_message(msg_data: dict):
         result = chat_completion_with_tools(
             messages=messages,
             model_name=model_name,
-            allow_tools=is_admin # ONLY ADMINS GET TOOLS
+            allow_tools=True, # EVERYONE GETS TOOLS NOW
+            permitted_tools=permitted_tools
         )
         reply_text = result["reply"]
         
