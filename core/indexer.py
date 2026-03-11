@@ -7,9 +7,18 @@ import os
 import glob
 import json
 import uuid
+from threading import Thread
+
+# ── Environment hardening for Chroma / Pydantic settings ─────
+# Some systems define lowercase env vars like `gemini_api_key` or
+# `deepseek_api_key`. Chroma's Pydantic Settings class does not
+# expect these and will crash with "extra_forbidden" errors.
+# We defensively remove them before importing chromadb.
+for _var in ("gemini_api_key", "deepseek_api_key"):
+    os.environ.pop(_var, None)
+
 import chromadb
 import google.generativeai as genai
-from threading import Thread
 
 # Global vars for simple state tracking
 INDEXING_STATUS = "idle"
@@ -44,7 +53,7 @@ def _embed_texts(texts: list[str]) -> list[list[float]]:
     # genai.embed_content takes a model name and list of texts
     try:
         result = genai.embed_content(
-            model="models/embedding-001",
+            model="models/gemini-embedding-001",
             content=texts,
             task_type="retrieval_document"
         )
@@ -145,7 +154,7 @@ def semantic_search(query: str, n_results: int = 5):
     """Search the chroma database based on a text query."""
     try:
         result = genai.embed_content(
-            model="models/embedding-001",
+            model="models/gemini-embedding-001",
             content=query,
             task_type="retrieval_query"
         )

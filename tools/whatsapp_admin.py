@@ -1,0 +1,66 @@
+"""
+Tools for managing WhatsApp contacts and automated behaviors.
+"""
+
+from core.tool_registry import register_tool
+import database
+
+@register_tool
+def save_whatsapp_contact(phone_number: str, name: str, rules: str = ""):
+    """
+    Save or update a WhatsApp contact's configuration, including behavior rules.
+    
+    Args:
+        phone_number (str): The WhatsApp ID (e.g., '923123456789@c.us')
+        name (str): A friendly name for the contact.
+        rules (str): Specific instructions for how the AI should behave with this contact.
+    """
+    try:
+        database.save_wa_contact(phone_number, name, summary="", rules=rules)
+        return f"Successfully saved contact {name} ({phone_number}) with rules: {rules}"
+    except Exception as e:
+        return f"Error saving contact: {e}"
+
+@register_tool
+def delete_whatsapp_contact(phone_number: str):
+    """
+    Delete a WhatsApp contact and its rules from the database.
+    
+    Args:
+        phone_number (str): The WhatsApp ID to delete.
+    """
+    try:
+        database.delete_wa_contact(phone_number)
+        return f"Successfully deleted contact {phone_number}"
+    except Exception as e:
+        return f"Error deleting contact: {e}"
+@register_tool
+def search_whatsapp_contacts(query: str):
+    """
+    Search for a WhatsApp contact by name to find their phone number/ID.
+    
+    Args:
+        query (str): The name or partial name to search for.
+    """
+    try:
+        contacts = database.get_all_wa_contacts()
+        # Find matches by name
+        results = [c for c in contacts if query.lower() in (c.get('name') or '').lower()]
+        if not results:
+            return f"No contacts found in database matching '{query}'"
+        return f"Found contacts: {results}"
+    except Exception as e:
+        return f"Error searching contacts: {e}"
+@register_tool
+def clear_whatsapp_history(phone_number: str = None):
+    """
+    Clear the chat history for a specific contact or for everyone (if no phone_number provided).
+    
+    Args:
+        phone_number (str): The WhatsApp ID to clear (e.g., '923123456789@c.us').
+    """
+    try:
+        database.clear_wa_history(phone_number)
+        return f"Successfully cleared history for {phone_number if phone_number else 'all contacts'}."
+    except Exception as e:
+        return f"Error clearing history: {e}"
