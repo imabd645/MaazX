@@ -5,6 +5,15 @@ Handles parsing and embedding external documents like PDFs and Word Docs.
 
 import os
 import uuid
+
+# ── Environment hardening for Chroma / Pydantic settings ─────
+# Some systems define lowercase env vars like `gemini_api_key` or
+# `deepseek_api_key`. Chroma's Pydantic Settings class does not
+# expect these and will crash with "extra_forbidden" errors.
+# We defensively remove them before importing chromadb.
+for _var in ("gemini_api_key", "deepseek_api_key"):
+    os.environ.pop(_var, None)
+
 import chromadb
 import google.generativeai as genai
 
@@ -77,7 +86,7 @@ def index_document(filepath: str) -> dict:
     # Generate embeddings
     try:
         result = genai.embed_content(
-            model="models/embedding-001",
+            model="models/gemini-embedding-001",
             content=chunks,
             task_type="retrieval_document"
         )
@@ -129,7 +138,7 @@ def query_knowledge(query: str, n_results: int = 5) -> list:
     """Search the knowledge database based on a text query."""
     try:
         result = genai.embed_content(
-            model="models/embedding-001",
+            model="models/gemini-embedding-001",
             content=query,
             task_type="retrieval_query"
         )

@@ -3,11 +3,11 @@ Core logic for the WhatsApp AI Agent.
 Handles incoming messages, formats conversation history, queries the AI, and sends replies back to the bridge.
 """
 
+import json
 import requests
-import google.generativeai as genai
 import database
 import openrouter_client
-from config import GEMINI_API_KEY
+from core.deepseek_client import chat_completion_with_tools
 
 def handle_incoming_message(msg_data: dict):
     """
@@ -43,65 +43,75 @@ def handle_incoming_message(msg_data: dict):
     model_name = settings.get("model_name", "gemini-2.5-flash")
     owner_name = settings.get("wa_owner_name", "User")
     
+    # Detect if sender is an admin
+    from config import WHATSAPP_ADMIN_NUMBERS
+    is_admin = sender in WHATSAPP_ADMIN_NUMBERS
+    
     # Run Intent Classifier
     from core.intent_classifier import classify_intent
     intent = classify_intent(body)
+    
+    print(f"\n[WA Debug] Sender: {sender} | Admin: {is_admin} | Intent: {intent}")
+    print(f"[WA Debug] User Message: {body}")
 
     # 3. Build the System Prompt
-    system_prompt = f"""
-    [CLASSIFIED INTENT: {intent}]
-    You are an AI assistant managing WhatsApp messages on behalf of {owner_name}.
-    You are currently talking to: {contact_name} ({sender}).
-    
-    Specific Rules for this contact:
-    {rules}
-    
-    General Guidelines:
-    - You represent {owner_name}. If asked who you are, explain you are {owner_name}'s AI assistant.
-    - Keep replies concise, natural, and human-sounding (WhatsApp style).
-    - Do not use markdown like bolding (**) overly much, keep it plain.
-    - If a message seems urgent, flag it by starting your reply with [URGENT].
-    """
+    if is_admin:
+        system_prompt = f"""
+        [ADMIN PRIVILEGES ENABLED]
+        You are the {owner_name}'s AI Command Core. You are speaking to the ADMIN ({sender}).
+        
+        IDENTIFIED INTENT: {intent}
+        WORKING DIRECTORY: {database.load_settings().get('cwd', 'Default')}
+        
+        POWERS:
+        - You MUST use tools to fulfill requests.
+        - To message someone else, use the 'send_whatsapp' tool.
+        - To save a contact or update rules, use 'save_whatsapp_contact'.
+        - You can also read/edit files, run shell commands, and schedule tasks.
+        
+        INSTRUCTIONS:
+        1. If the admin asks to send a message, call 'send_whatsapp' immediately.
+        2. If the admin asks to schedule something, use 'schedule_action'.
+        3. Do NOT greet the user or be conversational if an action is requested. Just run the tool.
+        4. Confirm actions briefly AFTER the tool has returned a result.
+        5. CRITICAL: Do NOT use markdown formatting (no **, no *, no _). Use plain text or simple caps for headers.
+        """
+    else:
+        system_prompt = f"""
+        [USER MODE]
+        You are an AI assistant managing WhatsApp for {owner_name}.
+        You are talking to: {contact_name} ({sender}).
+        Rules: {rules}
+        
+        INSTRUCTIONS:
+        - Be concise and natural.
+        - You DO NOT have system tools for this user. Just chat.
+        - CRITICAL: Do NOT use markdown formatting (no **, no *, no _).
+        """
 
     reply_text = "I'm sorry, I encountered an error processing your message."
 
     try:
-        # Check if it's an OpenRouter model or Gemini
-        if model_name in openrouter_client.OPENROUTER_MODELS:
-            # We must map the history to OpenAI format
-            messages = [{"role": "system", "content": system_prompt}]
-            for msg in history:
-                messages.append({"role": msg["role"], "content": msg["content"]})
-            
-            # Since the current message is already in history, we don't append it again
-            openrouter_key = settings.get("openrouter_api_key", "")
-            
-            # We aren't passing tools here to keep the WhatsApp replies safe/fast
-            choice, tc = openrouter_client.chat_completion(
-                openrouter_key,
-                openrouter_client.OPENROUTER_MODELS[model_name],
-                messages
-            )
-            reply_text = choice
-            
-        else:
-            # Gemini Model
-            if GEMINI_API_KEY:
-                genai.configure(api_key=GEMINI_API_KEY)
-                model = genai.GenerativeModel(model_name, system_instruction=system_prompt)
-                
-                # Convert history to Gemini format (user vs model)
-                gemini_history = []
-                # Gemini requires 'user' and 'model' roles. Our DB stores 'user' and 'assistant'
-                for msg in history[:-1]: # exclude the latest message to pass it as the new prompt
-                    role = "user" if msg["role"] == "user" else "model"
-                    gemini_history.append({"role": role, "parts": [msg["content"]]})
-                
-                chat = model.start_chat(history=gemini_history)
-                response = chat.send_message(body)
-                reply_text = response.text
-            else:
-                reply_text = "Gemini API Key is not configured."
+        # Build message history for DeepSeek
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        
+        # DEBUG: See exactly what we send to DeepSeek
+        print(f"[WA Debug] Full Message Payload: {json.dumps(messages, indent=2)}")
+        
+        # DeepSeek Native Model execution
+        result = chat_completion_with_tools(
+            messages=messages,
+            model_name=model_name,
+            allow_tools=is_admin # ONLY ADMINS GET TOOLS
+        )
+        reply_text = result["reply"]
+        
+        if is_admin:
+            print(f"[WA Debug] Admin Reply: {reply_text[:100]}...")
+            if result.get("executed_tools"):
+                print(f"[WA Debug] Tools Executed: {result['executed_tools']}")
 
     except Exception as e:
         print(f"AI Generation Error: {e}")

@@ -23,7 +23,8 @@ def classify_intent(user_msg: str) -> str:
     """
     
     # We purposefully configure a dedicated client just for this burst call
-    genai.configure(api_key=config.GEMINI_API_KEY)
+    if not config.DEEPSEEK_API_KEY:
+        return "task"
     
     classifier_prompt = f"""
 You are an Intent Classifier for an AI Coding Agent. 
@@ -48,16 +49,27 @@ USER MESSAGE:
 """
 
     try:
-        model = genai.GenerativeModel(model_name=CLASSIFIER_MODEL)
-        response = model.generate_content(
-            classifier_prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.0,      # Deterministic
-                max_output_tokens=5,  # We only need 1 word
-            )
-        )
+        import requests
         
-        intent = response.text.strip().lower()
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "user", "content": classifier_prompt}
+            ],
+            "temperature": 0.0,
+            "max_tokens": 5
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post("https://api.deepseek.com/chat/completions", headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        intent = data["choices"][0]["message"]["content"].strip().lower()
         
         # Fallback sanitize to ensure it is exactly one of the known enums
         valid_intents = {"chat", "task", "search", "automation"}
