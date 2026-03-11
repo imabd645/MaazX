@@ -200,8 +200,10 @@ if (document.getElementById('wa-logout-btn')) {
 document.querySelectorAll('.quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const prompt = btn.dataset.prompt;
-        input.value = prompt;
-        sendMessage();
+        if (prompt) {
+            input.value = prompt;
+            sendMessage();
+        }
     });
 });
 
@@ -723,6 +725,15 @@ async function loadSettings() {
         const elOpRouter = document.getElementById('setting-openrouter-key');
         if (elOpRouter) elOpRouter.value = s.openrouter_api_key || '';
 
+        const elDeepSeek = document.getElementById('setting-deepseek-key');
+        if (elDeepSeek) elDeepSeek.value = s.deepseek_api_key || '';
+
+        const elGemini = document.getElementById('setting-gemini-key');
+        if (elGemini) elGemini.value = s.gemini_api_key || '';
+
+        const elAdmins = document.getElementById('setting-wa-admins');
+        if (elAdmins) elAdmins.value = s.wa_admin_numbers || '';
+
         const elOwner = document.getElementById('setting-wa-owner');
         if (elOwner) elOwner.value = s.wa_owner_name || 'User';
     } catch { /* ignore */ }
@@ -736,6 +747,9 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         command_timeout: parseInt(document.getElementById('setting-timeout')?.value) || 60,
         max_dir_depth: parseInt(document.getElementById('setting-depth')?.value) || 3,
         openrouter_api_key: document.getElementById('setting-openrouter-key')?.value?.trim() || '',
+        deepseek_api_key: document.getElementById('setting-deepseek-key')?.value?.trim() || '',
+        gemini_api_key: document.getElementById('setting-gemini-key')?.value?.trim() || '',
+        wa_admin_numbers: document.getElementById('setting-wa-admins')?.value?.trim() || '',
         wa_owner_name: document.getElementById('setting-wa-owner')?.value?.trim() || 'User',
     };
 

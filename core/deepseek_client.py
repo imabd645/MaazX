@@ -225,10 +225,15 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
         model_name: Name of the model to use.
         allow_tools: If False, ignores all tools.
         permitted_tools: Optional list of specific tool names to allow (whitelist).
+    Returns:
+        {"reply": final_text_string, "executed_tools": list_of_dicts}
     """
-    api_key = config.DEEPSEEK_API_KEY
+    import database
+    settings = database.load_settings()
+    
+    api_key = settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
     if not api_key or api_key == "sk-deepseek-api-key-here":
-        raise ValueError("DeepSeek API Key is missing or invalid in config.py")
+        raise ValueError("DeepSeek API Key is missing. Please set it in Settings.")
 
     headers = {
         "Authorization": f"Bearer {api_key}",

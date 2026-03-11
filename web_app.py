@@ -19,14 +19,15 @@ from core.tool_registry import get_all_tools, get_tool_by_name
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# ── Agent setup ─────────────────────────────────────────────
-config.validate()
-genai.configure(api_key=config.GEMINI_API_KEY)
-
-_tools = get_all_tools()
-
 # Load persisted settings from SQLite
 app_settings = db.load_settings()
+
+# ── Agent setup ─────────────────────────────────────────────
+config.validate()
+# Configure Gemini with DB key if available, else fall back to config
+genai_key = app_settings.get("gemini_api_key") or config.GEMINI_API_KEY
+if genai_key:
+    genai.configure(api_key=genai_key)
 
 # Session tracking
 current_session_id = str(uuid.uuid4())[:8]
