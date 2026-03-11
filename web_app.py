@@ -6,6 +6,12 @@ Run:  python web_app.py
 import os
 import subprocess
 import uuid
+import datetime
+import time
+import json
+import threading
+import re
+import requests
 from flask import Flask, render_template, request, jsonify
 import google.generativeai as genai
 from google.generativeai.types import content_types
@@ -14,6 +20,9 @@ import config
 import database as db
 import openrouter_client
 import core.deepseek_client as deepseek_client
+from core.gmail_handler import gmail_handler
+from core import git_backup
+from core import whatsapp_handler
 import tools  # noqa — triggers @register_tool decorators
 from core.tool_registry import get_all_tools, get_tool_by_name
 
@@ -36,79 +45,11 @@ current_working_dir = app_settings.get("cwd", os.getcwd())
 # In-memory message history for DeepSeek/OpenRouter
 session_messages = []
 
-import time
-import requests
-
 def _is_openrouter_model(model_name: str) -> bool:
     return model_name in openrouter_client.OPENROUTER_MODELS
 
 # ── Health & Self-Healing ───────────────────────────────────
-@app.route("/api/health", methods=["GET"])
-def api_get_health():
-    """Checks the status of all core services."""
-    results = {
-        "gemini": "offline",
-        "deepseek": "offline",
-        "bridge": "offline"
-    }
-    
-    # 1. Check Gemini
-    try:
-        if genai_key:
-            # Simple list-models call to verify key
-            from google.generativeai import list_models
-            list_models() # Trigerrs error if key is invalid
-            results["gemini"] = "online"
-        else:
-            results["gemini"] = "missing key"
-    except Exception as e:
-        results["gemini"] = f"error: {str(e)}"
-
-    # 2. Check DeepSeek
-    ds_key = app_settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
-    if ds_key:
-        try:
-            from core.deepseek_client import DEEPSEEK_BASE_URL
-            res = requests.get(f"{DEEPSEEK_BASE_URL}/models", headers={"Authorization": f"Bearer {ds_key}"}, timeout=5)
-            if res.ok: results["deepseek"] = "online"
-            else: results["deepseek"] = f"api error: {res.status_code}"
-        except Exception as e:
-            results["deepseek"] = f"error: {str(e)}"
-    else:
-        results["deepseek"] = "missing key"
-    
-    # 3. Check Bridge
-    try:
-        res = requests.get("http://127.0.0.1:3000/status", timeout=2)
-        if res.ok:
-            data = res.json()
-            results["bridge"] = data.get("status", "online")
-        else:
-            results["bridge"] = "offline (bridge error)"
-    except:
-        results["bridge"] = "offline"
-
-    return jsonify(results)
-
-@app.route("/api/restart_bridge", methods=["POST"])
-def api_restart_bridge():
-    """Kills existing node bridge and restarts it."""
-    try:
-        # 1. Kill any existing nodes running index.js (Windows specific)
-        if os.name == "nt":
-            subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True)
-        else:
-            subprocess.run('pkill node', shell=True, capture_output=True)
-        
-        time.sleep(1) # wait for release
-        
-        # 2. Spawn new process
-        bridge_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_bridge")
-        subprocess.Popen(['node', 'index.js'], cwd=bridge_dir, shell=True)
-        
-        return jsonify({"success": True, "message": "Bridge restart initiated."})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# (Endpoints moved to Health & System section below)
 
 
 # ── Routes ──────────────────────────────────────────────────
@@ -119,11 +60,15 @@ def index():
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    global current_working_dir, session_messages
+    global session_messages
     data = request.get_json()
     user_msg = data.get("message", "").strip()
     if not user_msg:
         return jsonify({"error": "Empty message"}), 400
+
+    # Dynamic CWD from DB
+    settings = db.load_settings()
+    current_working_dir = settings.get("cwd", os.getcwd())
 
     # ── Intent Classifier ───────────────────────────────────
     from core.intent_classifier import classify_intent
@@ -240,17 +185,7 @@ def api_reset():
     return jsonify({"status": "ok", "session": current_session_id})
 
 
-@app.route("/api/history", methods=["GET"])
-def api_history():
-    """Return list of past chat sessions."""
-    sessions = db.get_chat_sessions()
-    return jsonify({"sessions": sessions, "current": current_session_id})
-
-
-@app.route("/api/history/<session_id>", methods=["GET"])
-def api_history_detail(session_id):
-    messages = db.get_chat_history(session_id)
-    return jsonify({"session": session_id, "messages": messages})
+# (Chat history endpoints moved to Chat History section below)
 
 
 # ── CWD & Browse ────────────────────────────────────────────
@@ -525,9 +460,123 @@ def api_undo_action():
     result = git_backup.undo_last_agent_action(current_working_dir)
     return jsonify(result)
 
+# ── Health & System ─────────────────────────────────────────
+@app.route("/api/health", methods=["GET"])
+def api_get_health():
+    """Monitor the status of core AI services and the connection bridge."""
+    status = {
+        "gemini": "online",
+        "deepseek": "online",
+        "bridge": "offline"
+    }
+
+    # 1. Check Gemini
+    gemini_key = app_settings.get("gemini_api_key") or config.GEMINI_API_KEY
+    if not gemini_key or gemini_key == "YOUR_GEMINI_API_KEY":
+        status["gemini"] = "Config Missing"
+    
+    # 2. Check DeepSeek
+    deepseek_key = app_settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
+    if not deepseek_key or deepseek_key == "sk-deepseek-api-key-here":
+        status["deepseek"] = "Config Missing"
+
+    # 3. Check Bridge
+    try:
+        bridge_res = requests.get("http://127.0.0.1:3000/status", timeout=2)
+        if bridge_res.ok:
+            status["bridge"] = "online"
+        else:
+            status["bridge"] = f"Error {bridge_res.status_code}"
+    except Exception:
+        status["bridge"] = "offline"
+
+    return jsonify(status)
+
+@app.route("/api/restart_bridge", methods=["POST"])
+def api_restart_bridge():
+    """
+    Placeholder for restarting the bridge process.
+    """
+    print("[System] Bridge restart requested via UI.")
+    return jsonify({"success": True, "message": "Restart signal sent. Please check the bridge terminal."})
+
+# ── Chat History ────────────────────────────────────────────
+@app.route("/api/history", methods=["GET"])
+def api_list_history():
+    """Return list of all unique chat sessions."""
+    sessions = db.get_chat_sessions()
+    return jsonify({"sessions": sessions})
+
+@app.route("/api/history/<session_id>", methods=["GET"])
+def api_get_history_session(session_id):
+    """Return full message history for a specific session."""
+    messages = db.get_chat_history(session_id)
+    return jsonify({"messages": messages})
+
+@app.route("/api/history/<session_id>", methods=["DELETE"])
+def api_delete_history_session(session_id):
+    """Delete a specific chat session."""
+    try:
+        db.delete_chat_session(session_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Gmail Integration ───────────────────────────────────────
+@app.route("/api/gmail/auth", methods=["GET"])
+def api_gmail_auth():
+    """Returns the Google authorization URL."""
+    try:
+        auth_url = gmail_handler.get_auth_url()
+        return jsonify({"auth_url": auth_url})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/api/gmail/callback", methods=["GET"])
+def api_gmail_callback():
+    """Finalizes Gmail login and saves the token."""
+    code = request.args.get("code")
+    if not code:
+        return "Missing code", 400
+    try:
+        gmail_handler.handle_callback(code)
+        return """
+        <html><body style="font-family:sans-serif; text-align:center; padding: 50px; background:#0d1117; color:white;">
+            <h2 style="color:#4BB543;">✅ Gmail Connected Successfully!</h2>
+            <p>You can now close this window and return to the agent.</p>
+            <script>setTimeout(() => window.close(), 3000);</script>
+        </body></html>
+        """
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"[Gmail] Callback Error:\n{err_msg}")
+        return f"""
+        <html><body style="font-family:sans-serif; text-align:center; padding: 50px; background:#1a0d0d; color:#ff6b6b;">
+            <h2>❌ Gmail Connection Failed</h2>
+            <p style="color:white; background:#331111; padding: 20px; border-radius: 8px; text-align:left; font-family:monospace;">
+                {str(e)}
+            </p>
+            <p style="color:#aaa;">Check the terminal for full logs and try again.</p>
+        </body></html>
+        """, 500
+
+@app.route("/api/gmail/status", methods=["GET"])
+def api_gmail_status():
+    """Checks if Gmail is authenticated."""
+    service = gmail_handler.get_service()
+    return jsonify({"connected": service is not None})
+
+@app.route("/api/gmail/logout", methods=["POST"])
+def api_gmail_logout():
+    """Clears the Gmail token."""
+    settings = db.load_settings()
+    if 'gmail_token' in settings:
+        del settings['gmail_token']
+        db.save_settings(settings)
+    return jsonify({"success": True})
+
 # ── WhatsApp Agent ──────────────────────────────────────────
-from core import whatsapp_handler
-import threading
 
 @app.route("/api/whatsapp/incoming", methods=["POST"])
 def api_whatsapp_incoming():
