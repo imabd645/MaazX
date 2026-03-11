@@ -26,7 +26,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools', 'btn-whatsapp', 'btn-settings', 'btn-jobs'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-whatsapp', 'btn-settings', 'btn-jobs', 'btn-health'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -39,7 +39,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'welcome'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'welcome'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -63,14 +63,14 @@ if (document.getElementById('btn-tools')) {
 if (document.getElementById('btn-wa-view')) {
     document.getElementById('btn-wa-view').addEventListener('click', () => {
         switchSidebarTab('btn-whatsapp');
-        document.getElementById('whatsapp-area').style.display = 'block';
+        document.getElementById('whatsapp-area').style.display = 'flex';
     });
 }
 
 if (document.getElementById('btn-settings')) {
     document.getElementById('btn-settings').addEventListener('click', () => {
         switchSidebarTab('btn-settings');
-        document.getElementById('settings-area').style.display = 'block';
+        document.getElementById('settings-area').style.display = 'flex';
         loadSettings();
     });
 }
@@ -78,8 +78,16 @@ if (document.getElementById('btn-settings')) {
 if (document.getElementById('btn-jobs')) {
     document.getElementById('btn-jobs').addEventListener('click', () => {
         switchSidebarTab('btn-jobs');
-        document.getElementById('jobs-area').style.display = 'block';
+        document.getElementById('jobs-area').style.display = 'flex';
         loadJobs();
+    });
+}
+
+if (document.getElementById('btn-health')) {
+    document.getElementById('btn-health').addEventListener('click', () => {
+        switchSidebarTab('btn-health');
+        document.getElementById('health-area').style.display = 'flex';
+        updateHealthStatus();
     });
 }
 
@@ -1422,3 +1430,89 @@ if (chatUploadBtn && chatFileInput) {
         }
     });
 }
+
+// ── Health Dashboard Logic ───────────────────────────────
+let healthPollingInterval = null;
+
+async function updateHealthStatus() {
+    const logContent = document.getElementById('health-log-content');
+    if (!logContent) return;
+
+    const log = (msg) => {
+        const time = new Date().toLocaleTimeString();
+        logContent.innerHTML += `<div>[${time}] ${msg}</div>`;
+        logContent.scrollTop = logContent.scrollHeight;
+    };
+
+    try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+
+        // Update indicators
+        updateIndicator('gemini', data.gemini);
+        updateIndicator('deepseek', data.deepseek);
+        updateIndicator('bridge', data.bridge);
+
+        if (data.bridge === 'offline') {
+            log('<span style="color:var(--red)">BRIDGE OFFLINE: Connection to Node.js failed.</span>');
+        }
+
+    } catch (err) {
+        log('<span style="color:var(--red)">HEALTH CHECK FAILED: Backend unreachable.</span>');
+    }
+}
+
+function updateIndicator(service, status) {
+    const indicator = document.getElementById(`status-${service}`);
+    const desc = document.getElementById(`desc-${service}`);
+    if (!indicator || !desc) return;
+
+    indicator.className = 'status-indicator'; // Reset
+
+    if (status === 'online') {
+        indicator.textContent = 'Operational';
+        indicator.classList.add('status-online');
+        desc.textContent = 'Service is running normally.';
+    } else if (status === 'offline') {
+        indicator.textContent = 'Offline';
+        indicator.classList.add('status-offline');
+        desc.textContent = 'Connection timeout or process stopped.';
+    } else {
+        indicator.textContent = 'Error';
+        indicator.classList.add('status-warning');
+        desc.textContent = status; // Show exact error
+    }
+}
+
+// Start polling
+if (!healthPollingInterval) {
+    updateHealthStatus();
+    healthPollingInterval = setInterval(updateHealthStatus, 15000); // Poll every 15s
+}
+
+const btnRestartBridge = document.getElementById('btn-restart-bridge');
+if (btnRestartBridge) {
+    btnRestartBridge.addEventListener('click', async () => {
+        const originalText = btnRestartBridge.innerHTML;
+        btnRestartBridge.innerHTML = 'Restarting...';
+        btnRestartBridge.disabled = true;
+
+        try {
+            const res = await fetch('/api/restart_bridge', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+                alert('Restart command sent! Waiting for bridge to re-initialize...');
+                setTimeout(updateHealthStatus, 5000);
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (err) {
+            alert('Restart failed: ' + err.message);
+        } finally {
+            btnRestartBridge.innerHTML = originalText;
+            btnRestartBridge.disabled = false;
+        }
+    });
+}
+
