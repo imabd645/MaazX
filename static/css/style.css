@@ -746,6 +746,25 @@ body {
     flex-shrink: 0;
 }
 
+.chat-upload-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    transition: all .15s;
+    margin-bottom: 3px;
+}
+
+.chat-upload-btn:hover {
+    color: var(--accent-light);
+    background: var(--bg-hover);
+}
+
 .input-wrapper {
     max-width: 820px;
     margin: 0 auto;
