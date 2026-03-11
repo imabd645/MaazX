@@ -47,8 +47,14 @@ const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
     puppeteer: {
         executablePath: executablePath,
-        // Required for some Linux/Windows environments
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: 'new', // Use newer headless mode if available
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-extensions',
+            '--no-zygote'
+        ]
     }
 });
 

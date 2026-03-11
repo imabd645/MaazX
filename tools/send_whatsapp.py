@@ -33,14 +33,16 @@ def send_whatsapp(contact_name_or_phone: str, message: str) -> str:
         available = ", ".join([f"{c.get('name', 'Unknown')} ({c['phone_number']})" for c in contacts])
         return f"Error: Could not find contact matching '{contact_name_or_phone}'. Available contacts: {available}"
         
-    # 2. Save the outgoing message to history so the AI remembers sending it
-    db.save_wa_message(matched_phone, "assistant", message)
+    # 2. Skip saving to history here as the WhatsApp handler now saves the full turn history.
     
     # 3. Send to Node.js bridge
     try:
+        from core.utils import strip_markdown
+        plain_message = strip_markdown(message)
+        
         res = requests.post(
             "http://127.0.0.1:3000/send",
-            json={"to": matched_phone, "message": message},
+            json={"to": matched_phone, "message": plain_message},
             timeout=15
         )
         res.raise_for_status()
