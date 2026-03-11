@@ -1,5 +1,5 @@
 """
-Web UI for the Gemini Coding Agent.
+Web UI for the DeepSeek Coding Agent.
 Run:  python web_app.py
 """
 
@@ -13,44 +13,102 @@ from google.generativeai.types import content_types
 import config
 import database as db
 import openrouter_client
+import core.deepseek_client as deepseek_client
 import tools  # noqa — triggers @register_tool decorators
 from core.tool_registry import get_all_tools, get_tool_by_name
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# ── Agent setup ─────────────────────────────────────────────
-config.validate()
-genai.configure(api_key=config.GEMINI_API_KEY)
-
-_tools = get_all_tools()
-
 # Load persisted settings from SQLite
 app_settings = db.load_settings()
+
+# ── Agent setup ─────────────────────────────────────────────
+config.validate()
+# Configure Gemini with DB key if available, else fall back to config
+genai_key = app_settings.get("gemini_api_key") or config.GEMINI_API_KEY
+if genai_key:
+    genai.configure(api_key=genai_key)
 
 # Session tracking
 current_session_id = str(uuid.uuid4())[:8]
 current_working_dir = app_settings.get("cwd", os.getcwd())
 
-# OpenRouter message history (for non-Gemini models)
-openrouter_messages = []
+# In-memory message history for DeepSeek/OpenRouter
+session_messages = []
 
+import time
+import requests
 
 def _is_openrouter_model(model_name: str) -> bool:
     return model_name in openrouter_client.OPENROUTER_MODELS
 
+# ── Health & Self-Healing ───────────────────────────────────
+@app.route("/api/health", methods=["GET"])
+def api_get_health():
+    """Checks the status of all core services."""
+    results = {
+        "gemini": "offline",
+        "deepseek": "offline",
+        "bridge": "offline"
+    }
+    
+    # 1. Check Gemini
+    try:
+        if genai_key:
+            # Simple list-models call to verify key
+            from google.generativeai import list_models
+            list_models() # Trigerrs error if key is invalid
+            results["gemini"] = "online"
+        else:
+            results["gemini"] = "missing key"
+    except Exception as e:
+        results["gemini"] = f"error: {str(e)}"
 
-def _build_gemini_model(model_name: str):
-    """Create a fresh Gemini model + chat."""
-    m = genai.GenerativeModel(
-        model_name=model_name,
-        tools=_tools,
-        system_instruction=config.SYSTEM_INSTRUCTION,
-    )
-    return m, m.start_chat(enable_automatic_function_calling=True)
+    # 2. Check DeepSeek
+    ds_key = app_settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
+    if ds_key:
+        try:
+            from core.deepseek_client import DEEPSEEK_BASE_URL
+            res = requests.get(f"{DEEPSEEK_BASE_URL}/models", headers={"Authorization": f"Bearer {ds_key}"}, timeout=5)
+            if res.ok: results["deepseek"] = "online"
+            else: results["deepseek"] = f"api error: {res.status_code}"
+        except Exception as e:
+            results["deepseek"] = f"error: {str(e)}"
+    else:
+        results["deepseek"] = "missing key"
+    
+    # 3. Check Bridge
+    try:
+        res = requests.get("http://127.0.0.1:3000/status", timeout=2)
+        if res.ok:
+            data = res.json()
+            results["bridge"] = data.get("status", "online")
+        else:
+            results["bridge"] = "offline (bridge error)"
+    except:
+        results["bridge"] = "offline"
 
+    return jsonify(results)
 
-# Initialize Gemini model
-model, chat = _build_gemini_model(app_settings.get("model_name", config.MODEL_NAME))
+@app.route("/api/restart_bridge", methods=["POST"])
+def api_restart_bridge():
+    """Kills existing node bridge and restarts it."""
+    try:
+        # 1. Kill any existing nodes running index.js (Windows specific)
+        if os.name == "nt":
+            subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True)
+        else:
+            subprocess.run('pkill node', shell=True, capture_output=True)
+        
+        time.sleep(1) # wait for release
+        
+        # 2. Spawn new process
+        bridge_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_bridge")
+        subprocess.Popen(['node', 'index.js'], cwd=bridge_dir, shell=True)
+        
+        return jsonify({"success": True, "message": "Bridge restart initiated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Routes ──────────────────────────────────────────────────
@@ -61,7 +119,7 @@ def index():
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    global current_working_dir, openrouter_messages
+    global current_working_dir, session_messages
     data = request.get_json()
     user_msg = data.get("message", "").strip()
     if not user_msg:
@@ -97,11 +155,11 @@ def api_chat():
         if not api_key:
             return jsonify({"error": "OpenRouter API key not set. Go to Settings to add it."}), 400
 
-        openrouter_messages.append({"role": "user", "content": context_msg})
+        session_messages.append({"role": "user", "content": context_msg})
 
         try:
             # Add system message if first message
-            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + openrouter_messages
+            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages
             
             # Disable tools if intent is pure conversational
             if intent == "chat":
@@ -126,7 +184,7 @@ def api_chat():
                     except Exception as e:
                         reply_text += f"\n\nTool {tc['name']} error: {e}"
 
-            openrouter_messages.append({"role": "assistant", "content": reply_text})
+            session_messages.append({"role": "assistant", "content": reply_text})
             db.save_chat_message(current_session_id, "assistant", reply_text, executed_tools)
 
             return jsonify({
@@ -137,69 +195,48 @@ def api_chat():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    # ── Gemini path ─────────────────────────────────────────
-    # If the intent is purely conversational, completely disable tool calling to prevent hallucination
-    if intent == "chat":
-        mode_val = "none"
+    # ── DeepSeek path ───────────────────────────────────────
     else:
-        mode_val = app_settings.get("tool_mode", "any")
-
-    current_tool_cfg = content_types.to_tool_config(
-        {"function_calling_config": {"mode": mode_val}}
-    )
-
-    try:
-        response = chat.send_message(context_msg, tool_config=current_tool_cfg)
-
-        reply_text = None
+        allow_tools = (intent != "chat")
+        
+        session_messages.append({"role": "user", "content": context_msg})
+        
         try:
-            if response.text:
-                reply_text = response.text
-        except (ValueError, AttributeError):
-            pass
+            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages
+            
+            result = deepseek_client.chat_completion_with_tools(
+                messages=msgs,
+                model_name=current_model,
+                allow_tools=allow_tools
+            )
+            
+            reply_text = result["reply"]
+            executed_tools = result["executed_tools"]
+            
+            # The chat_completion_with_tools mutates the msgs array by appending tool roles
+            # We must sync those appends back to our session_messages (minus the system prompt)
+            session_messages.clear()
+            session_messages.extend(msgs[1:])
+            
+            db.save_chat_message(current_session_id, "assistant", reply_text, executed_tools)
 
-        if not reply_text:
-            for content_block in reversed(chat.history):
-                for part in content_block.parts:
-                    fn_resp = getattr(part, "function_response", None)
-                    if fn_resp:
-                        result = fn_resp.response.get("result")
-                        if result:
-                            reply_text = str(result)
-                            break
-                if reply_text:
-                    break
+            return jsonify({
+                "reply": reply_text,
+                "tool_calls": executed_tools,
+            })
 
-        tool_calls = []
-        for content_block in chat.history[-6:]:
-            for part in content_block.parts:
-                fn_call = getattr(part, "function_call", None)
-                if fn_call:
-                    tool_calls.append({
-                        "name": fn_call.name,
-                        "args": dict(fn_call.args) if fn_call.args else {},
-                    })
-
-        final_reply = reply_text or "Done."
-        db.save_chat_message(current_session_id, "assistant", final_reply, tool_calls[-5:])
-
-        return jsonify({
-            "reply": final_reply,
-            "tool_calls": tool_calls[-5:],
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        except Exception as e:
+            # Pop the user message so they can retry
+            if session_messages and session_messages[-1]["role"] == "user":
+                session_messages.pop()
+            return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
-    global chat, current_session_id, openrouter_messages
+    global current_session_id, session_messages
     current_session_id = str(uuid.uuid4())[:8]
-    openrouter_messages = []
-    model_name = app_settings.get("model_name", config.MODEL_NAME)
-    if not _is_openrouter_model(model_name):
-        _, chat = _build_gemini_model(model_name)
+    session_messages = []
     return jsonify({"status": "ok", "session": current_session_id})
 
 

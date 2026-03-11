@@ -73,12 +73,15 @@ def init_db():
 # ── Settings ────────────────────────────────────────────────
 DEFAULT_SETTINGS = {
     "auto_run_commands": True,
-    "model_name": "gemini-2.5-flash",
+    "model_name": "deepseek-chat",
     "command_timeout": 60,
     "max_dir_depth": 3,
     "tool_mode": "any",
     "theme": "dark",
     "openrouter_api_key": "",
+    "gemini_api_key": "",
+    "deepseek_api_key": "",
+    "wa_admin_numbers": "",
     "wa_owner_name": "User",
 }
 
@@ -257,13 +260,17 @@ def save_wa_message(phone_number: str, role: str, content: str):
     conn.close()
 
 def get_wa_history(phone_number: str, limit: int = 40):
+    """Return the most recent messages for a contact, in chronological order."""
     conn = _get_conn()
+    # Get latest messages first (DESC) then reverse them for the LLM (ASC order)
     rows = conn.execute(
-        "SELECT role, content, timestamp FROM whatsapp_messages WHERE phone_number = ? ORDER BY id ASC LIMIT ?",
+        "SELECT role, content, timestamp FROM whatsapp_messages WHERE phone_number = ? ORDER BY id DESC LIMIT ?",
         (phone_number, limit)
     ).fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    
+    # Reverse so they are in chronological order: [oldest, ..., newest]
+    return [dict(row) for row in reversed(rows)]
 
 def clear_wa_history(phone_number: str = None):
     conn = _get_conn()

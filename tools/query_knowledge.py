@@ -9,9 +9,8 @@ from core import knowledge_indexer
 @register_tool
 def query_knowledge(query: str, max_results: int = 5) -> str:
     """
-    Search the Knowledge Base for context that matches the *meaning* of the query.
-    Use this when the user asks questions about uploaded documents (like 'What does the PDF say about X?' 
-    or 'Summarize the company policy').
+    Use this when the user asks questions about uploaded documents (like 'What does the PDF say about the scholarship?' 
+    or 'Summarize the deed of agreement').
 
     Args:
         query: A natural language sentence to search for in the knowledge base.
