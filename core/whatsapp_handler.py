@@ -45,7 +45,14 @@ def handle_incoming_message(msg_data: dict):
     
     # Detect if sender is an admin
     from config import WHATSAPP_ADMIN_NUMBERS
-    is_admin = sender in WHATSAPP_ADMIN_NUMBERS
+
+    # Load settings to check for dynamic admin numbers
+    admin_str = settings.get("wa_admin_numbers", "")
+    # Parse comma-separated admin numbers
+    dynamic_admins = [n.strip() for n in admin_str.split(",") if n.strip()]
+    
+    # Check if sender is in the hardcoded config OR the dynamic list
+    is_admin = sender in WHATSAPP_ADMIN_NUMBERS or sender in dynamic_admins
     
     # Run Intent Classifier
     from core.intent_classifier import classify_intent

@@ -79,6 +79,9 @@ DEFAULT_SETTINGS = {
     "tool_mode": "any",
     "theme": "dark",
     "openrouter_api_key": "",
+    "gemini_api_key": "",
+    "deepseek_api_key": "",
+    "wa_admin_numbers": "",
     "wa_owner_name": "User",
 }
 
