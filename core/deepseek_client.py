@@ -244,8 +244,8 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
     
     executed_tools_log = []
 
-    # Loop allows up to 10 sequential tool calls to prevent infinite loops
-    for _ in range(10):
+    # Loop allows up to 20 sequential tool calls to prevent infinite loops
+    for _ in range(20):
         payload = {
             "model": model_name,
             "messages": messages,
