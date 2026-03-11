@@ -13,16 +13,21 @@ from core.tool_registry import get_all_tools, get_tool_by_name
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions"
 
-def build_tool_definitions() -> List[Dict[str, Any]]:
+def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
     """
     Builds OpenAI/DeepSeek-compatible JSON schema tool definitions 
     from our locally registered Python functions.
+    If whitelist is provided, only tools in the list are included.
     """
     tools = []
     registry = get_all_tools()
     
     for tool_func in registry:
         name = tool_func.__name__
+        
+        if whitelist is not None and name not in whitelist:
+            continue
+            
         description = tool_func.__doc__ or ""
         # A simple generation mapping Python args to JSON Schema.
         # In a generic implementation, we'd inspect the signature, 
@@ -210,17 +215,16 @@ def build_tool_definitions() -> List[Dict[str, Any]]:
     return tools
 
 
-def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True) -> Dict[str, Any]:
+def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None) -> Dict[str, Any]:
     """
     Sends a completion request to DeepSeek.
-    If DeepSeek returns tool calls, this function Executes them locally, 
-    appends the results to `messages`, and calls DeepSeek again in a loop 
-    until a final text response is produced.
-    
-    Mutates `messages` in-place by appending the assistant's context and tool outputs.
-    
-    Returns:
-        {"reply": final_text_string, "executed_tools": list_of_dicts}
+    If DeepSeek returns tool calls, this function Executes them locally.
+
+    Args:
+        messages: The conversation history.
+        model_name: Name of the model to use.
+        allow_tools: If False, ignores all tools.
+        permitted_tools: Optional list of specific tool names to allow (whitelist).
     """
     api_key = config.DEEPSEEK_API_KEY
     if not api_key or api_key == "sk-deepseek-api-key-here":
@@ -231,7 +235,7 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
         "Content-Type": "application/json"
     }
 
-    schema_tools = build_tool_definitions() if allow_tools else []
+    schema_tools = build_tool_definitions(whitelist=permitted_tools) if allow_tools else []
     
     executed_tools_log = []
 
