@@ -1,7 +1,42 @@
-"""Tool: run_command — executes a shell command and returns stdout/stderr."""
+"""Tool: run_command — executes a shell command and returns stdout/stderr.
 
+Security hardening:
+- We apply a very small deny‑list of obviously dangerous commands
+  (e.g. full‑disk wipes, shutdown) to reduce accidental damage.
+- For anything more advanced, prefer running commands manually in your own shell.
+"""
+
+import os
 import subprocess
 from core.tool_registry import register_tool
+
+
+def _is_dangerous_command(command: str) -> bool:
+    """Best‑effort guard against obviously destructive commands.
+
+    This is intentionally conservative: it blocks only a few patterns that
+    are almost never desired from an automated agent.
+    """
+    cmd = command.strip().lower()
+
+    # Unix‑style catastrophic patterns
+    dangerous_substrings = [
+        "rm -rf /",
+        "rm -rf /*",
+        "mkfs",
+        " :(){ :|:& };:",  # fork bomb
+    ]
+
+    # Windows‑style catastrophic patterns
+    dangerous_substrings += [
+        "format c:",
+        "format d:",
+        "shutdown /s",
+        "shutdown /r",
+        "del /s /q c:\\",
+    ]
+
+    return any(pattern in cmd for pattern in dangerous_substrings)
 
 
 @register_tool
@@ -14,13 +49,22 @@ def run_command(command: str, working_directory: str = ".") -> str:
         working_directory: The directory to run the command in (default is current directory).
     """
     try:
+        if _is_dangerous_command(command):
+            return (
+                "Blocked: Command matches a deny‑listed pattern that could be destructive.\n"
+                "Please run this manually in your own terminal if you really intend to execute it."
+            )
+
+        # Normalize working directory to an absolute path for clarity
+        cwd = os.path.abspath(working_directory or ".")
+
         result = subprocess.run(
             command,
             shell=True,
             capture_output=True,
             text=True,
             timeout=60,
-            cwd=working_directory,
+            cwd=cwd,
         )
 
         output_parts = []
