@@ -70,18 +70,26 @@ def handle_incoming_message(msg_data: dict):
         IDENTIFIED INTENT: {intent}
         WORKING DIRECTORY: {database.load_settings().get('cwd', 'Default')}
         
-        POWERS:
-        - You MUST use tools to fulfill requests.
-        - To message someone else, use the 'send_whatsapp' tool.
-        - To save a contact or update rules, use 'save_whatsapp_contact'.
-        - You can also read/edit files, run shell commands, and schedule tasks.
+        ------------------------------------------------------------
+        GOLDEN RULE: NEVER HALLUCINATE ACTION
+        ------------------------------------------------------------
+        - If the Admin asks for an action (Send, Search, Delete, Edit, Run), you MUST call a tool.
+        - Saying "Message sent" without a 'tool_call' in the metadata is a CRITICAL FAILURE.
+        - You are an Agent, not a Chatbot. Do not simulate results.
         
-        INSTRUCTIONS:
-        1. If the admin asks to send a message, call 'send_whatsapp' immediately.
-        2. If the admin asks to schedule something, use 'schedule_action'.
-        3. Do NOT greet the user or be conversational if an action is requested. Just run the tool.
-        4. Confirm actions briefly AFTER the tool has returned a result.
-        5. CRITICAL: Do NOT use markdown formatting (no **, no *, no _). Use plain text or simple caps for headers.
+        POWERS & TOOLS:
+        - To message someone else: use 'send_whatsapp(contact_name_or_phone, message)'.
+        - To manage contacts: use 'save_whatsapp_contact' or 'delete_whatsapp_contact'.
+        - To browse files: use 'list_directory' or 'search_files'.
+        - To edit code: use 'edit_file' or 'patch_file'.
+        - To execute: use 'run_command'.
+        
+        SPECIFIC INSTRUCTIONS:
+        1. FORWARDING MESSAGES: If Admin says "Send X to Name", call 'send_whatsapp' immediately.
+        2. CONTACT RESOLUTION: If the name is known in history (e.g. "Mama", "Hamna"), use that name in the tool.
+        3. NO FLUFF: Do not say "Okay", "I will do that", or "Sure". Just trigger the tool.
+        4. VERIFICATION: Briefly confirm the result ONLY after the tool returns.
+        5. FORMATTING: Use PLAIN TEXT ONLY. NO MARKDOWN (no stars, no underscores).
         """
         permitted_tools = None # Admin gets everything
     else:
@@ -91,13 +99,14 @@ def handle_incoming_message(msg_data: dict):
         You are talking to: {contact_name} ({sender}).
         Rules: {rules}
         
-        POWERS:
-        - You have access to Web Search tools to answer questions.
-        
-        INSTRUCTIONS:
-        - Be concise and natural.
-        - Use 'search_web' and 'read_webpage' if the user asks for information you don't have.
-        - CRITICAL: Do NOT use markdown formatting (no **, no *, no _).
+        ------------------------------------------------------------
+        STRICT OPERATING PROCEDURES
+        ------------------------------------------------------------
+        - You are helpful but concise.
+        - If you need information from the web to answer, you MUST use 'search_web'.
+        - If you need to check documents, you MUST use 'query_knowledge'.
+        - NEVER make up facts. If a tool fails, tell the user the service is temporarily down.
+        - NO MARKDOWN: (no **, no *, no _). Use CAPS or spacing for emphasis.
         """
         permitted_tools = ["search_web", "read_webpage"]
         # Force intent to task if they ask a question that needs search? 
@@ -109,7 +118,17 @@ def handle_incoming_message(msg_data: dict):
         # Build message history for DeepSeek
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+            m = {"role": msg["role"], "content": msg["content"]}
+            if msg.get("tool_calls"):
+                m["tool_calls"] = msg["tool_calls"]
+            if msg.get("tool_call_id"):
+                m["tool_call_id"] = msg["tool_call_id"]
+            if msg.get("name"):
+                m["name"] = msg["name"]
+            messages.append(m)
+        
+        # Capture input count BEFORE AI call to slice new turns correctly
+        input_count = len(messages)
         
         # DEBUG: See exactly what we send to DeepSeek
         print(f"[WA Debug] Full Message Payload: {json.dumps(messages, indent=2)}")
@@ -118,7 +137,7 @@ def handle_incoming_message(msg_data: dict):
         result = chat_completion_with_tools(
             messages=messages,
             model_name=model_name,
-            allow_tools=True, # EVERYONE GETS TOOLS NOW
+            allow_tools=True, 
             permitted_tools=permitted_tools
         )
         reply_text = result["reply"]
@@ -129,11 +148,31 @@ def handle_incoming_message(msg_data: dict):
                 print(f"[WA Debug] Tools Executed: {result['executed_tools']}")
 
     except Exception as e:
-        print(f"AI Generation Error: {e}")
+        # Use repr(e) or safe string to avoid encoding issues in Windows terminal
+        print(f"AI Generation Error: {str(e).encode('ascii', errors='replace').decode('ascii')}")
         reply_text = "Sorry, my brain went offline for a second! Try again."
+        # result for error case
+        result = {"reply": reply_text, "history": messages + [{"role": "assistant", "content": reply_text}]}
+        input_count = len(messages) # Ensure slice logic still works
 
-    # 5. Save and Send Reply
-    database.save_wa_message(sender, "assistant", reply_text)
+    # 5. Save all new intermediate messages (tool calls, tool results, final reply)
+    new_messages = result.get("history", [])[input_count:]
+    
+    if new_messages:
+        print(f"[WA Debug] Saving {len(new_messages)} new history items...")
+        for m in new_messages:
+            # Ensure content is never None for NOT NULL DB columns
+            content_val = m.get("content") or ""
+            database.save_wa_message(
+                sender, 
+                m["role"], 
+                content_val, 
+                tool_calls=m.get("tool_calls"),
+                tool_call_id=m.get("tool_call_id"),
+                name=m.get("name")
+            )
+    else:
+        print("[WA Debug] No new history items to save (AI likely failed/limited).")
 
     try:
         # Send back to Node.js Bridge
