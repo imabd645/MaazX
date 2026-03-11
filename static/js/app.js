@@ -1370,3 +1370,55 @@ if (kbUploadBtn && kbFileInput) {
         }
     });
 }
+const chatUploadBtn = document.getElementById('chat-upload-btn');
+const chatFileInput = document.getElementById('chat-file-input');
+
+if (chatUploadBtn && chatFileInput) {
+    chatUploadBtn.addEventListener('click', () => chatFileInput.click());
+
+    chatFileInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        chatUploadBtn.style.color = 'var(--accent)';
+        chatUploadBtn.style.opacity = '0.5';
+        chatUploadBtn.disabled = true;
+
+        try {
+            let names = [];
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('file', files[i]);
+                names.push(files[i].name);
+
+                const res = await fetch('/api/knowledge/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Upload failed');
+                }
+            }
+
+            // Successfully uploaded. Now trigger the agent.
+            const inputEl = document.getElementById('message-input');
+            const fileList = names.join(', ');
+            inputEl.value = `I have uploaded ${fileList} to the Knowledge Base. Please search these documents and tell me what they are about, and answer any relevant questions.`;
+
+            // Trigger auto-send
+            document.getElementById('send-btn').click();
+
+            // Refresh Knowledge Base list if visible elsewhere
+            if (typeof loadKnowledgeBase === 'function') loadKnowledgeBase();
+
+        } catch (err) {
+            alert('Upload error: ' + err.message);
+        } finally {
+            chatUploadBtn.style.color = '';
+            chatUploadBtn.style.opacity = '';
+            chatUploadBtn.disabled = false;
+            chatFileInput.value = ''; // Reset input
+        }
+    });
+}
