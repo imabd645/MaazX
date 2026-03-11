@@ -210,6 +210,45 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             tool_schema["function"]["parameters"]["properties"] = {
                 "phone_number": {"type": "string", "description": "Optional WhatsApp ID to clear"}
             }
+
+        # ── Gmail Tools ──
+        elif name == "gmail_search_emails":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "query": {"type": "string", "description": "Search query (e.g. 'from:boss')"},
+                "max_results": {"type": "integer", "description": "Default 5"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["query"]
+
+        elif name == "gmail_read_email":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "message_id": {"type": "string", "description": "The unique Gmail message ID"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["message_id"]
+
+        elif name == "gmail_send_email":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "recipient": {"type": "string", "description": "Recipient email address"},
+                "subject": {"type": "string", "description": "Email subject line"},
+                "body": {"type": "string", "description": "Full email message body"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["recipient", "subject", "body"]
+
+        else:
+            # Generic fallback for any other tools: assume they take a query or try to inspect
+            import inspect
+            sig = inspect.signature(tool_func)
+            for param_name, param in sig.parameters.items():
+                p_type = "string"
+                if param.annotation == int: p_type = "integer"
+                elif param.annotation == bool: p_type = "boolean"
+                
+                tool_schema["function"]["parameters"]["properties"][param_name] = {
+                    "type": p_type,
+                    "description": f"Argument {param_name}"
+                }
+                if param.default == inspect.Parameter.empty:
+                    tool_schema["function"]["parameters"]["required"].append(param_name)
+
         tools.append(tool_schema)
         
     return tools
@@ -255,7 +294,7 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
         if schema_tools:
             payload["tools"] = schema_tools
 
-        print(f"\n[DeepSeek] API Request (Model: {model_name}, Tools: {len(schema_tools) if schema_tools else 0})")
+        print(f"\n[DeepSeek] API Request (Model: {model_name})")
         # print(f"[Payload] {json.dumps(payload, indent=2)}")
         
         resp = requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, timeout=120)
@@ -279,7 +318,8 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             messages.append({"role": "assistant", "content": reply_text})
             return {
                 "reply": reply_text or "Done.",
-                "executed_tools": executed_tools_log
+                "executed_tools": executed_tools_log,
+                "history": messages
             }
             
         # 2. Model wants to use tools

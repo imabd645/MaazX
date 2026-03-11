@@ -141,6 +141,19 @@
                         <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
                     </svg>
                 </button>
+                <button class="nav-btn" id="btn-gmail" title="Gmail Integration"
+                    style="flex:1; justify-content:center; padding: 10px; margin:0; color:var(--text-secondary);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                </button>
+                <button class="nav-btn" id="btn-history" title="Chat History"
+                    style="flex:1; justify-content:center; padding: 10px; margin:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </button>
                 <button class="nav-btn" id="btn-jobs" title="Scheduled Tasks"
                     style="flex:1; justify-content:center; padding: 10px; margin:0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -545,6 +558,64 @@
                     </div>
                 </div>
 
+                <!-- Chat History Area -->
+                <div class="history-area" id="history-area"
+                    style="display:none; padding:40px; overflow-y:auto; flex:1;">
+                    <div class="welcome" style="max-width:800px; margin:0 auto; display:block;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h1>Chat <span style="color:var(--accent)">History</span></h1>
+                            <button id="history-refresh-btn" class="quick-btn"
+                                style="border-color:var(--accent); color:var(--accent);">
+                                Refresh List
+                            </button>
+                        </div>
+                        <p>View and manage your past AI conversations.</p>
+                        <hr style="border-top:1px solid var(--border); margin: 30px 0;">
+
+                        <div id="history-list-container" style="display:flex; flex-direction:column; gap:15px;">
+                            <div style="color:var(--text-secondary); text-align:center; padding: 20px;">Loading
+                                history...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gmail Integration Area -->
+                <div class="gmail-area" id="gmail-area" style="display:none; padding:40px; overflow-y:auto; flex:1;">
+                    <div class="welcome" style="max-width:800px; margin:0 auto; display:block;">
+                        <h1>Gmail <span style="color:var(--accent)">Integration</span></h1>
+                        <p>Connect your Google account to allow the AI to read and send emails.</p>
+                        <hr style="border-top:1px solid var(--border); margin: 30px 0;">
+
+                        <div id="gmail-status-card"
+                            style="background:var(--bg-tertiary); border:1px solid var(--border); border-radius:12px; padding:30px; text-align:center;">
+                            <div id="gmail-status-icon" style="font-size:40px; margin-bottom:15px;">📧</div>
+                            <h3 id="gmail-status-text">Checking connection...</h3>
+                            <p id="gmail-status-desc" style="color:var(--text-secondary); margin-bottom:20px;">Please
+                                wait while we verify your Gmail status.</p>
+
+                            <div id="gmail-auth-actions">
+                                <button id="btn-gmail-connect" class="setting-save-btn"
+                                    style="display:none; margin:0 auto;">Connect Google Account</button>
+                                <button id="btn-gmail-disconnect" class="quick-btn"
+                                    style="display:none; margin:0 auto; border-color:var(--red); color:var(--red);">Disconnect
+                                    Gmail</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:40px; color:var(--text-secondary); font-size:14px; line-height:1.6;">
+                            <h3>Capabilities</h3>
+                            <ul style="padding-left:20px;">
+                                <li><strong>Search Emails</strong>: Ask the AI to find specific threads or subjects.
+                                </li>
+                                <li><strong>Read Content</strong>: The AI can analyze email bodies to answer your
+                                    questions.</li>
+                                <li><strong>Send Messages</strong>: Drafting and sending emails directly through chat
+                                    tools.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Full Pane File Editor -->
                 <div class="file-editor-area" id="file-editor-area"
                     style="display:none; flex-direction:column; flex:1; overflow:hidden; border-bottom: 2px solid var(--border);">
@@ -585,7 +656,8 @@
                     style="margin: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                     <div class="welcome-icon">&#9889;</div>
                     <h1>DeepSeek Coding Agent</h1>
-                    <p>I can scan codebases, search files, edit code, and run commands.<br>Select a working directory in
+                    <p>I can scan codebases, search files, edit code, and run commands.<br>Select a working
+                        directory in
                         the sidebar to get started.</p>
                     <div class="quick-actions">
                         <button class="quick-btn" data-prompt="List all files in the current directory">
