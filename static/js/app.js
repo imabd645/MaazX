@@ -26,7 +26,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools', 'btn-whatsapp', 'btn-settings', 'btn-jobs'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-whatsapp', 'btn-settings', 'btn-jobs', 'btn-health'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -39,7 +39,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'welcome'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'welcome'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -63,14 +63,14 @@ if (document.getElementById('btn-tools')) {
 if (document.getElementById('btn-wa-view')) {
     document.getElementById('btn-wa-view').addEventListener('click', () => {
         switchSidebarTab('btn-whatsapp');
-        document.getElementById('whatsapp-area').style.display = 'block';
+        document.getElementById('whatsapp-area').style.display = 'flex';
     });
 }
 
 if (document.getElementById('btn-settings')) {
     document.getElementById('btn-settings').addEventListener('click', () => {
         switchSidebarTab('btn-settings');
-        document.getElementById('settings-area').style.display = 'block';
+        document.getElementById('settings-area').style.display = 'flex';
         loadSettings();
     });
 }
@@ -78,8 +78,16 @@ if (document.getElementById('btn-settings')) {
 if (document.getElementById('btn-jobs')) {
     document.getElementById('btn-jobs').addEventListener('click', () => {
         switchSidebarTab('btn-jobs');
-        document.getElementById('jobs-area').style.display = 'block';
+        document.getElementById('jobs-area').style.display = 'flex';
         loadJobs();
+    });
+}
+
+if (document.getElementById('btn-health')) {
+    document.getElementById('btn-health').addEventListener('click', () => {
+        switchSidebarTab('btn-health');
+        document.getElementById('health-area').style.display = 'flex';
+        updateHealthStatus();
     });
 }
 
@@ -200,8 +208,10 @@ if (document.getElementById('wa-logout-btn')) {
 document.querySelectorAll('.quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const prompt = btn.dataset.prompt;
-        input.value = prompt;
-        sendMessage();
+        if (prompt) {
+            input.value = prompt;
+            sendMessage();
+        }
     });
 });
 
@@ -723,6 +733,15 @@ async function loadSettings() {
         const elOpRouter = document.getElementById('setting-openrouter-key');
         if (elOpRouter) elOpRouter.value = s.openrouter_api_key || '';
 
+        const elDeepSeek = document.getElementById('setting-deepseek-key');
+        if (elDeepSeek) elDeepSeek.value = s.deepseek_api_key || '';
+
+        const elGemini = document.getElementById('setting-gemini-key');
+        if (elGemini) elGemini.value = s.gemini_api_key || '';
+
+        const elAdmins = document.getElementById('setting-wa-admins');
+        if (elAdmins) elAdmins.value = s.wa_admin_numbers || '';
+
         const elOwner = document.getElementById('setting-wa-owner');
         if (elOwner) elOwner.value = s.wa_owner_name || 'User';
     } catch { /* ignore */ }
@@ -736,6 +755,9 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         command_timeout: parseInt(document.getElementById('setting-timeout')?.value) || 60,
         max_dir_depth: parseInt(document.getElementById('setting-depth')?.value) || 3,
         openrouter_api_key: document.getElementById('setting-openrouter-key')?.value?.trim() || '',
+        deepseek_api_key: document.getElementById('setting-deepseek-key')?.value?.trim() || '',
+        gemini_api_key: document.getElementById('setting-gemini-key')?.value?.trim() || '',
+        wa_admin_numbers: document.getElementById('setting-wa-admins')?.value?.trim() || '',
         wa_owner_name: document.getElementById('setting-wa-owner')?.value?.trim() || 'User',
     };
 
@@ -1356,3 +1378,141 @@ if (kbUploadBtn && kbFileInput) {
         }
     });
 }
+const chatUploadBtn = document.getElementById('chat-upload-btn');
+const chatFileInput = document.getElementById('chat-file-input');
+
+if (chatUploadBtn && chatFileInput) {
+    chatUploadBtn.addEventListener('click', () => chatFileInput.click());
+
+    chatFileInput.addEventListener('change', async (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        chatUploadBtn.style.color = 'var(--accent)';
+        chatUploadBtn.style.opacity = '0.5';
+        chatUploadBtn.disabled = true;
+
+        try {
+            let names = [];
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('file', files[i]);
+                names.push(files[i].name);
+
+                const res = await fetch('/api/knowledge/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Upload failed');
+                }
+            }
+
+            // Successfully uploaded. Now trigger the agent.
+            const inputEl = document.getElementById('message-input');
+            const fileList = names.join(', ');
+            inputEl.value = `I have uploaded ${fileList} to the Knowledge Base. Please search these documents and tell me what they are about, and answer any relevant questions.`;
+
+            // Trigger auto-send
+            document.getElementById('send-btn').click();
+
+            // Refresh Knowledge Base list if visible elsewhere
+            if (typeof loadKnowledgeBase === 'function') loadKnowledgeBase();
+
+        } catch (err) {
+            alert('Upload error: ' + err.message);
+        } finally {
+            chatUploadBtn.style.color = '';
+            chatUploadBtn.style.opacity = '';
+            chatUploadBtn.disabled = false;
+            chatFileInput.value = ''; // Reset input
+        }
+    });
+}
+
+// ── Health Dashboard Logic ───────────────────────────────
+let healthPollingInterval = null;
+
+async function updateHealthStatus() {
+    const logContent = document.getElementById('health-log-content');
+    if (!logContent) return;
+
+    const log = (msg) => {
+        const time = new Date().toLocaleTimeString();
+        logContent.innerHTML += `<div>[${time}] ${msg}</div>`;
+        logContent.scrollTop = logContent.scrollHeight;
+    };
+
+    try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+
+        // Update indicators
+        updateIndicator('gemini', data.gemini);
+        updateIndicator('deepseek', data.deepseek);
+        updateIndicator('bridge', data.bridge);
+
+        if (data.bridge === 'offline') {
+            log('<span style="color:var(--red)">BRIDGE OFFLINE: Connection to Node.js failed.</span>');
+        }
+
+    } catch (err) {
+        log('<span style="color:var(--red)">HEALTH CHECK FAILED: Backend unreachable.</span>');
+    }
+}
+
+function updateIndicator(service, status) {
+    const indicator = document.getElementById(`status-${service}`);
+    const desc = document.getElementById(`desc-${service}`);
+    if (!indicator || !desc) return;
+
+    indicator.className = 'status-indicator'; // Reset
+
+    if (status === 'online') {
+        indicator.textContent = 'Operational';
+        indicator.classList.add('status-online');
+        desc.textContent = 'Service is running normally.';
+    } else if (status === 'offline') {
+        indicator.textContent = 'Offline';
+        indicator.classList.add('status-offline');
+        desc.textContent = 'Connection timeout or process stopped.';
+    } else {
+        indicator.textContent = 'Error';
+        indicator.classList.add('status-warning');
+        desc.textContent = status; // Show exact error
+    }
+}
+
+// Start polling
+if (!healthPollingInterval) {
+    updateHealthStatus();
+    healthPollingInterval = setInterval(updateHealthStatus, 15000); // Poll every 15s
+}
+
+const btnRestartBridge = document.getElementById('btn-restart-bridge');
+if (btnRestartBridge) {
+    btnRestartBridge.addEventListener('click', async () => {
+        const originalText = btnRestartBridge.innerHTML;
+        btnRestartBridge.innerHTML = 'Restarting...';
+        btnRestartBridge.disabled = true;
+
+        try {
+            const res = await fetch('/api/restart_bridge', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+                alert('Restart command sent! Waiting for bridge to re-initialize...');
+                setTimeout(updateHealthStatus, 5000);
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (err) {
+            alert('Restart failed: ' + err.message);
+        } finally {
+            btnRestartBridge.innerHTML = originalText;
+            btnRestartBridge.disabled = false;
+        }
+    });
+}
+

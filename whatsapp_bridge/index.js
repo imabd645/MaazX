@@ -130,6 +130,14 @@ app.post('/logout', async (req, res) => {
     }
 });
 
+app.get('/status', (req, res) => {
+    res.json({
+        status: client.info ? 'online' : 'offline',
+        qr_active: !!currentQR,
+        info: client.info || null
+    });
+});
+
 const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`WhatsApp Bridge Server running on http://localhost:${PORT}`);
