@@ -26,7 +26,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools', 'btn-whatsapp', 'btn-settings', 'btn-jobs', 'btn-health'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -39,7 +39,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'welcome'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'welcome'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -91,6 +91,30 @@ if (document.getElementById('btn-health')) {
     });
 }
 
+if (document.getElementById('btn-history')) {
+    document.getElementById('btn-history').addEventListener('click', () => {
+        switchSidebarTab('btn-history');
+        document.getElementById('history-area').style.display = 'flex';
+        loadChatHistoryList();
+    });
+}
+
+if (document.getElementById('btn-gmail')) {
+    document.getElementById('btn-gmail').addEventListener('click', () => {
+        switchSidebarTab('btn-gmail');
+        document.getElementById('gmail-area').style.display = 'flex';
+        updateGmailStatus();
+    });
+}
+
+if (document.getElementById('btn-knowledge')) {
+    document.getElementById('btn-knowledge').addEventListener('click', () => {
+        switchSidebarTab('btn-knowledge');
+        document.getElementById('knowledge-area').style.display = 'flex';
+        if (typeof loadKnowledgeBase === 'function') loadKnowledgeBase();
+    });
+}
+
 if (document.getElementById('btn-tools')) {
     document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
 }
@@ -132,13 +156,25 @@ if (btnThemeToggle) {
 /* New chat */
 if (document.getElementById('btn-new-chat')) {
     document.getElementById('btn-new-chat').addEventListener('click', async () => {
+        if (!confirm('Start a new chat session? This will clear the current view, but you can find this conversation in History later.')) return;
+
         switchSidebarTab('btn-chat');
         document.getElementById('welcome').style.display = 'flex';
 
-        await fetch('/api/reset', { method: 'POST' });
-        messagesDiv.innerHTML = '';
-        welcome.classList.remove('hidden');
-        input.focus();
+        try {
+            const res = await fetch('/api/reset', { method: 'POST' });
+            const data = await res.json();
+
+            messagesDiv.innerHTML = '';
+            // Clear history listing if visible so it refreshes next time
+            const historyContainer = document.getElementById('history-list-container');
+            if (historyContainer) historyContainer.innerHTML = '';
+
+            input.focus();
+            console.log('New session started:', data.session);
+        } catch (err) {
+            console.error('Failed to reset session:', err);
+        }
     });
 }
 
@@ -1515,4 +1551,172 @@ if (btnRestartBridge) {
         }
     });
 }
+
+// ── History Management ────────────────────────────────────
+async function loadChatHistoryList() {
+    const container = document.getElementById('history-list-container');
+    if (!container) return;
+
+    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">Fetching past sessions...</div>';
+
+    try {
+        const res = await fetch('/api/history');
+        const data = await res.json();
+
+        if (!data.sessions || data.sessions.length === 0) {
+            container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 40px;">No chat history found. Start a new chat to begin!</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        data.sessions.forEach(session => {
+            const date = new Date(session.last_ts * 1000).toLocaleString();
+            const card = document.createElement('div');
+            card.className = 'history-card';
+            card.innerHTML = `
+                <div class="history-info">
+                    <div class="history-session-id">Session: ${session.session}</div>
+                    <div class="history-meta">
+                        <span>${session.msg_count} messages</span>
+                        <span>Last active: ${date}</span>
+                    </div>
+                </div>
+                <div class="history-actions">
+                    <button class="delete-btn" title="Delete Session">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+
+            // Click to load
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.delete-btn')) return;
+                loadPastSession(session.session);
+            });
+
+            // Click to delete
+            const delBtn = card.querySelector('.delete-btn');
+            delBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Are you sure you want to delete this session? This cannot be undone.')) {
+                    await deleteSession(session.session);
+                }
+            });
+
+            container.appendChild(card);
+        });
+
+    } catch (err) {
+        container.innerHTML = `<div style="color:var(--red); text-align:center; padding: 20px;">Error loading history: ${err.message}</div>`;
+    }
+}
+
+async function loadPastSession(sessionId) {
+    try {
+        const res = await fetch(`/api/history/${sessionId}`);
+        const data = await res.json();
+
+        // Switch back to chat view
+        switchSidebarTab('btn-chat');
+        document.getElementById('welcome').style.display = 'none';
+
+        // Clear and load messages
+        const messagesContainer = document.getElementById('messages');
+        messagesContainer.innerHTML = '';
+
+        data.messages.forEach(msg => {
+            appendMessage(msg.role, msg.content, msg.tool_calls);
+        });
+
+        // Update current session ID in app context if possible or just visual
+        window.current_session_id = sessionId;
+
+    } catch (err) {
+        alert('Failed to load session: ' + err.message);
+    }
+}
+
+async function deleteSession(sessionId) {
+    try {
+        const res = await fetch(`/api/history/${sessionId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            loadChatHistoryList(); // Refresh
+        } else {
+            throw new Error(data.error || 'Delete failed');
+        }
+    } catch (err) {
+        alert('Error deleting session: ' + err.message);
+    }
+}
+
+document.getElementById('history-refresh-btn')?.addEventListener('click', loadChatHistoryList);
+
+/* ── Gmail Integration Logic ────────────────────────────── */
+async function updateGmailStatus() {
+    const statusIcon = document.getElementById('gmail-status-icon');
+    const statusText = document.getElementById('gmail-status-text');
+    const statusDesc = document.getElementById('gmail-status-desc');
+    const connectBtn = document.getElementById('btn-gmail-connect');
+    const disconnectBtn = document.getElementById('btn-gmail-disconnect');
+
+    if (!statusIcon) return;
+
+    try {
+        const res = await fetch('/api/gmail/status');
+        const data = await res.json();
+
+        if (data.connected) {
+            statusIcon.textContent = '✅';
+            statusText.textContent = 'Gmail Connected';
+            statusDesc.textContent = 'Your Google account is linked. The AI can now access your emails.';
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'block';
+        } else {
+            statusIcon.textContent = '📧';
+            statusText.textContent = 'Gmail Disconnected';
+            statusDesc.textContent = 'Connect your Google account to enable email capabilities.';
+            connectBtn.style.display = 'block';
+            disconnectBtn.style.display = 'none';
+        }
+    } catch (err) {
+        statusText.textContent = 'Error checking status';
+        console.error(err);
+    }
+}
+
+document.getElementById('btn-gmail-connect')?.addEventListener('click', async () => {
+    try {
+        const res = await fetch('/api/gmail/auth');
+        const data = await res.json();
+        if (data.auth_url) {
+            window.open(data.auth_url, '_blank', 'width=600,height=700');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Failed to start Gmail auth.');
+    }
+});
+
+document.getElementById('btn-gmail-disconnect')?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to disconnect your Gmail account?')) return;
+    try {
+        await fetch('/api/gmail/logout', { method: 'POST' });
+        updateGmailStatus();
+    } catch (err) {
+        alert('Failed to disconnect Gmail.');
+    }
+});
+
+// Periodic check if area is visible
+setInterval(() => {
+    const area = document.getElementById('gmail-area');
+    if (area && area.style.display === 'flex') {
+        updateGmailStatus();
+    }
+}, 5000);
 
