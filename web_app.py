@@ -1,5 +1,5 @@
 """
-Web UI for the Gemini Coding Agent.
+Web UI for the DeepSeek Coding Agent.
 Run:  python web_app.py
 """
 
@@ -13,6 +13,7 @@ from google.generativeai.types import content_types
 import config
 import database as db
 import openrouter_client
+import core.deepseek_client as deepseek_client
 import tools  # noqa — triggers @register_tool decorators
 from core.tool_registry import get_all_tools, get_tool_by_name
 
@@ -31,26 +32,11 @@ app_settings = db.load_settings()
 current_session_id = str(uuid.uuid4())[:8]
 current_working_dir = app_settings.get("cwd", os.getcwd())
 
-# OpenRouter message history (for non-Gemini models)
-openrouter_messages = []
-
+# In-memory message history for DeepSeek/OpenRouter
+session_messages = []
 
 def _is_openrouter_model(model_name: str) -> bool:
     return model_name in openrouter_client.OPENROUTER_MODELS
-
-
-def _build_gemini_model(model_name: str):
-    """Create a fresh Gemini model + chat."""
-    m = genai.GenerativeModel(
-        model_name=model_name,
-        tools=_tools,
-        system_instruction=config.SYSTEM_INSTRUCTION,
-    )
-    return m, m.start_chat(enable_automatic_function_calling=True)
-
-
-# Initialize Gemini model
-model, chat = _build_gemini_model(app_settings.get("model_name", config.MODEL_NAME))
 
 
 # ── Routes ──────────────────────────────────────────────────
@@ -61,7 +47,7 @@ def index():
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    global current_working_dir, openrouter_messages
+    global current_working_dir, session_messages
     data = request.get_json()
     user_msg = data.get("message", "").strip()
     if not user_msg:
@@ -97,11 +83,11 @@ def api_chat():
         if not api_key:
             return jsonify({"error": "OpenRouter API key not set. Go to Settings to add it."}), 400
 
-        openrouter_messages.append({"role": "user", "content": context_msg})
+        session_messages.append({"role": "user", "content": context_msg})
 
         try:
             # Add system message if first message
-            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + openrouter_messages
+            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages
             
             # Disable tools if intent is pure conversational
             if intent == "chat":
@@ -126,7 +112,7 @@ def api_chat():
                     except Exception as e:
                         reply_text += f"\n\nTool {tc['name']} error: {e}"
 
-            openrouter_messages.append({"role": "assistant", "content": reply_text})
+            session_messages.append({"role": "assistant", "content": reply_text})
             db.save_chat_message(current_session_id, "assistant", reply_text, executed_tools)
 
             return jsonify({
@@ -137,69 +123,48 @@ def api_chat():
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    # ── Gemini path ─────────────────────────────────────────
-    # If the intent is purely conversational, completely disable tool calling to prevent hallucination
-    if intent == "chat":
-        mode_val = "none"
+    # ── DeepSeek path ───────────────────────────────────────
     else:
-        mode_val = app_settings.get("tool_mode", "any")
-
-    current_tool_cfg = content_types.to_tool_config(
-        {"function_calling_config": {"mode": mode_val}}
-    )
-
-    try:
-        response = chat.send_message(context_msg, tool_config=current_tool_cfg)
-
-        reply_text = None
+        allow_tools = (intent != "chat")
+        
+        session_messages.append({"role": "user", "content": context_msg})
+        
         try:
-            if response.text:
-                reply_text = response.text
-        except (ValueError, AttributeError):
-            pass
+            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages
+            
+            result = deepseek_client.chat_completion_with_tools(
+                messages=msgs,
+                model_name=current_model,
+                allow_tools=allow_tools
+            )
+            
+            reply_text = result["reply"]
+            executed_tools = result["executed_tools"]
+            
+            # The chat_completion_with_tools mutates the msgs array by appending tool roles
+            # We must sync those appends back to our session_messages (minus the system prompt)
+            session_messages.clear()
+            session_messages.extend(msgs[1:])
+            
+            db.save_chat_message(current_session_id, "assistant", reply_text, executed_tools)
 
-        if not reply_text:
-            for content_block in reversed(chat.history):
-                for part in content_block.parts:
-                    fn_resp = getattr(part, "function_response", None)
-                    if fn_resp:
-                        result = fn_resp.response.get("result")
-                        if result:
-                            reply_text = str(result)
-                            break
-                if reply_text:
-                    break
+            return jsonify({
+                "reply": reply_text,
+                "tool_calls": executed_tools,
+            })
 
-        tool_calls = []
-        for content_block in chat.history[-6:]:
-            for part in content_block.parts:
-                fn_call = getattr(part, "function_call", None)
-                if fn_call:
-                    tool_calls.append({
-                        "name": fn_call.name,
-                        "args": dict(fn_call.args) if fn_call.args else {},
-                    })
-
-        final_reply = reply_text or "Done."
-        db.save_chat_message(current_session_id, "assistant", final_reply, tool_calls[-5:])
-
-        return jsonify({
-            "reply": final_reply,
-            "tool_calls": tool_calls[-5:],
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        except Exception as e:
+            # Pop the user message so they can retry
+            if session_messages and session_messages[-1]["role"] == "user":
+                session_messages.pop()
+            return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/reset", methods=["POST"])
 def api_reset():
-    global chat, current_session_id, openrouter_messages
+    global current_session_id, session_messages
     current_session_id = str(uuid.uuid4())[:8]
-    openrouter_messages = []
-    model_name = app_settings.get("model_name", config.MODEL_NAME)
-    if not _is_openrouter_model(model_name):
-        _, chat = _build_gemini_model(model_name)
+    session_messages = []
     return jsonify({"status": "ok", "session": current_session_id})
 
 
