@@ -158,6 +158,12 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             }
             tool_schema["function"]["parameters"]["required"] = ["url"]
 
+        elif name == "take_screenshot":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "filename": {"type": "string", "description": "Optional name for the file (e.g. 'desktop.png')"},
+                "send_to_whatsapp": {"type": "string", "description": "Optional: Phone number or WhatsApp ID to send the image to immediately after capture"}
+            }
+
         elif name == "send_whatsapp":
             tool_schema["function"]["parameters"]["properties"] = {
                 "contact_name_or_phone": {"type": "string", "description": "Name or phone ID (e.g. 'Hamna' or '923123456789@c.us')"},
