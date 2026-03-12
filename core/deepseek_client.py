@@ -119,7 +119,7 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
 
         elif name == "list_memories":
             # No arguments needed
-            pass
+            tool_schema["function"]["parameters"]["properties"] = {}
             
         elif name == "patch_file":
             tool_schema["function"]["parameters"]["properties"] = {
@@ -248,6 +248,10 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
                 }
                 if param.default == inspect.Parameter.empty:
                     tool_schema["function"]["parameters"]["required"].append(param_name)
+
+        # Clean up empty required arrays which some strict APIs reject
+        if not tool_schema["function"]["parameters"]["required"]:
+            del tool_schema["function"]["parameters"]["required"]
 
         tools.append(tool_schema)
         
