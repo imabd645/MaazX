@@ -15,6 +15,9 @@ VK_VOLUME_UP = 0xAF
 VK_MEDIA_NEXT_TRACK = 0xB0
 VK_MEDIA_PREV_TRACK = 0xB1
 VK_MEDIA_PLAY_PAUSE = 0xB3
+VK_RETURN = 0x0D
+VK_TAB = 0x09
+VK_DOWN = 0x28
 
 KEYEVENTF_EXTENDEDKEY = 0x0001
 KEYEVENTF_KEYUP = 0x0002
@@ -276,3 +279,41 @@ def close_app(app_name: str) -> str:
             return f"No running process found named '{app_name}'."
     except Exception as e:
         return f"Error trying to close '{app_name}': {str(e)}"
+
+@register_tool
+def spotify_search(query: str) -> str:
+    """
+    Opens the Spotify Desktop app and searches for a specific song, artist, or album.
+    Note: On Windows, this uses the 'spotify:search' URI scheme.
+    
+    Args:
+        query: The song name, artist, or search term (e.g., 'Starboy', 'The Weeknd', '80s Rock').
+    """
+    import subprocess
+    import urllib.parse
+    import time
+    
+    try:
+        # Encode the query for URI
+        encoded_query = urllib.parse.quote(query)
+        # Windows command to start a URI
+        uri = f"spotify:search:{encoded_query}"
+        
+        # Using shell=True for 'start' command on Windows
+        subprocess.Popen(["start", uri], shell=True)
+        
+        # Wait for Spotify to load results (3 seconds for stability)
+        time.sleep(3)
+        
+        # Exact sequence provided by user to trigger play:
+        _press_key(VK_TAB)    # Shift focus from search bar
+        time.sleep(0.5)
+        _press_key(VK_DOWN)   # Select the top result
+        time.sleep(0.5)
+        _press_key(VK_RETURN) # Trigger play (1st enter)
+        time.sleep(0.5)
+        _press_key(VK_RETURN) # Confirm play (2nd enter)
+        
+        return f"Spotify search for '{query}' performed and play sequence executed (Tab -> Down -> Enter x2)."
+    except Exception as e:
+        return f"Failed to perform detailed Spotify search and play sequence: {str(e)}"
