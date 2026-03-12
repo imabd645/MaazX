@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const express = require('express');
 const axios = require('axios');
@@ -121,6 +121,36 @@ app.post('/send', async (req, res) => {
         if (errStr.includes("t: t") || errStr.includes("evaluate") || errStr.includes("undefined")) {
             return res.status(400).json({ error: "WhatsApp Web rejected the phone number format. Ensure the number includes the exact International Country Code WITHOUT a leading zero or '+' symbol (e.g. use '923350806140' instead of '03350806140')." });
         }
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// REST endpoint for the Python backend to send Images/Media back to WhatsApp
+app.post('/send_media', async (req, res) => {
+    const { to, filePath, caption } = req.body;
+    if (!to || !filePath) {
+        return res.status(400).json({ error: 'Missing "to" or "filePath" fields' });
+    }
+
+    try {
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'File not found on disk: ' + filePath });
+        }
+
+        // Enforce the WhatsApp internal ID suffix
+        let chatId = to;
+        if (!chatId.includes('@c.us') && !chatId.includes('@g.us')) {
+            chatId = `${chatId.replace(/[^0-9]/g, '')}@c.us`;
+        }
+
+        const media = MessageMedia.fromFilePath(filePath);
+        const options = caption ? { caption: caption } : {};
+
+        const sentMsg = await client.sendMessage(chatId, media, options);
+        res.json({ success: true, messageId: sentMsg.id._serialized });
+        console.log(`[Outgoing Media] ${to}: ${filePath}`);
+    } catch (err) {
+        console.error('Error sending WhatsApp media:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
