@@ -209,6 +209,19 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
                 "app_name": {"type": "string", "description": "Name of the app/process to close"}
             }
             tool_schema["function"]["parameters"]["required"] = ["app_name"]
+            
+        # ── Webcam Tools ──
+        elif name == "take_webcam_photo":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "send_to_whatsapp": {"type": "string", "description": "WhatsApp phone number or ID to send the photo to"}
+            }
+        elif name == "pc_send_file":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "filename": {"type": "string", "description": "Name or full path of the file to send"},
+                "contact": {"type": "string", "description": "WhatsApp ID/phone to send the file to"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["filename", "contact"]
+            
         elif name == "spotify_search":
             tool_schema["function"]["parameters"]["properties"] = {
                 "query": {"type": "string", "description": "The song, artist, or album to search and auto-play"}
