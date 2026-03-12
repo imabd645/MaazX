@@ -22,7 +22,7 @@ def execute_scheduled_task(prompt: str):
     The function that runs when a cron job fires.
     It spawns a fresh AI Agent instance and gives it the prompt.
     """
-    print(f"\n[Scheduler] ⏰ WAKING UP TO EXECUTE TASK: {prompt}")
+    print(f"\n[Scheduler] WAKING UP TO EXECUTE TASK: {prompt}")
     try:
         # Import lazily to avoid circular imports during boot
         from core.agent import Agent
@@ -56,6 +56,43 @@ def add_cron_job(prompt: str, minute: str = "*", hour: str = "*", day: str = "*"
     job = scheduler.add_job(
         execute_scheduled_task, 
         trigger=trigger, 
+        args=[prompt],
+        name=description[:50]
+    )
+    
+    # SAFETY CHECK: If next_run_time is way in the future (e.g. > 1 week), it's likely a cron mismatch
+    import datetime
+    if job.next_run_time:
+        now = datetime.datetime.now(job.next_run_time.tzinfo)
+        diff = job.next_run_time - now
+        if diff.days > 7:
+            # Delete the job and return error
+            err_msg = f"Error: Task scheduled for {job.next_run_time} ({diff.days} days away). This is too far in the future. Check if you used the correct day-of-week (0=Mon) or use 'schedule_once' with a specific date."
+            scheduler.remove_job(job.id)
+            return err_msg
+    
+    return str(job.id)
+
+def add_date_job(prompt: str, run_at: str, description: str = "One-time Task") -> str:
+    """
+    Registers a one-time job using a specific date/time string.
+    Supported format: YYYY-MM-DD HH:MM:SS
+    """
+    from apscheduler.triggers.date import DateTrigger
+    import datetime
+    
+    # Try parsing common formats
+    try:
+        dt = datetime.datetime.fromisoformat(run_at.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            dt = datetime.datetime.strptime(run_at, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return f"Error: Invalid date format '{run_at}'. Use YYYY-MM-DD HH:MM:SS"
+
+    job = scheduler.add_job(
+        execute_scheduled_task,
+        trigger=DateTrigger(run_date=dt),
         args=[prompt],
         name=description[:50]
     )
