@@ -185,7 +185,17 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
                 "description": {"type": "string", "description": "Human label for the task"}
             }
             tool_schema["function"]["parameters"]["required"] = ["prompt", "run_at", "description"]
-
+        
+        # ── PC Control Tools ──
+        elif name == "lock_pc":
+            tool_schema["function"]["parameters"]["properties"] = {}
+        elif name == "pc_power_control":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "action": {"type": "string", "enum": ["shutdown", "restart", "sleep", "cancel"]}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["action"]
+            
+        # ── Git Tools ──
         elif name == "get_database_schema":
             tool_schema["function"]["parameters"]["properties"] = {
                 "db_path": {"type": "string", "description": "Name or path of DB (default agent_data.db)"}
