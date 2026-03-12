@@ -25,6 +25,7 @@ from core import git_backup
 from core import whatsapp_handler
 import tools  # noqa — triggers @register_tool decorators
 from core.tool_registry import get_all_tools, get_tool_by_name
+from core import bridge_manager
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -707,7 +708,22 @@ def api_delete_job(job_id):
     return jsonify({"error": "Failed to remove job"}), 500
 
 
+def is_port_in_use(port):
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
 if __name__ == "__main__":
+    # 0. Single Instance Lock
+    if is_port_in_use(5000):
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, "Gemini AI Agent is already running!", "Agent Error", 0x10)
+        os._exit(1)
+
+    # 1. Start WhatsApp Bridge (Node.js)
+    bridge_manager.start_bridge()
+    
+    # 2. Start Background Scheduler
     import core.scheduler
     core.scheduler.start_scheduler()
     
