@@ -44,3 +44,6 @@ import tools.pc_control
 
 # System Monitor
 import tools.system_monitor
+
+# Git Manager
+import tools.git_manager

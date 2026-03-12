@@ -64,3 +64,21 @@ def clear_whatsapp_history(phone_number: str = None):
         return f"Successfully cleared history for {phone_number if phone_number else 'all contacts'}."
     except Exception as e:
         return f"Error clearing history: {e}"
+@register_tool
+def trim_whatsapp_history(count: int, phone_number: str = None):
+    """
+    Delete a specific number of recent messages from the chat history.
+    Useful for 'undoing' a few messages or clearing context errors.
+    
+    Args:
+        count (int): Number of most recent messages to delete.
+        phone_number (str): The WhatsApp ID (e.g., '923123456789@c.us').
+    """
+    try:
+        if not phone_number:
+            return "Error: phone_number is required to identify which chat to trim."
+            
+        database.delete_wa_latest_messages(phone_number, count)
+        return f"Successfully deleted the last {count} messages for {phone_number}."
+    except Exception as e:
+        return f"Error trimming history: {e}"
