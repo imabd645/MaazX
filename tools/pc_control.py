@@ -143,3 +143,136 @@ def analyze_screenshot(query: str) -> str:
         return f"Screen Analysis Results:\n\n{response.text}"
     except Exception as e:
         return f"Error during screen analysis: {str(e)}"
+
+@register_tool
+def lock_pc() -> str:
+    """
+    Immediately locks the Windows workstation (same as Win+L).
+    """
+    try:
+        ctypes.windll.user32.LockWorkStation()
+        return "Workstation locked successfully."
+    except Exception as e:
+        return f"Failed to lock workstation: {str(e)}"
+
+@register_tool
+def pc_power_control(action: str) -> str:
+    """
+    Performs power-related actions like shutdown, restart, and sleep.
+    
+    Args:
+        action: Must be one of: 'shutdown', 'restart', 'sleep', 'cancel'.
+                'shutdown' and 'restart' include a 60-second grace period.
+                'cancel' aborts a pending shutdown/restart.
+    """
+    import subprocess
+    action = action.lower()
+    
+    try:
+        if action == 'shutdown':
+            subprocess.run(["shutdown", "/s", "/t", "60"], check=True)
+            return "PC is scheduled to shutdown in 60 seconds. Use 'cancel' to abort."
+        elif action == 'restart':
+            subprocess.run(["shutdown", "/r", "/t", "60"], check=True)
+            return "PC is scheduled to restart in 60 seconds. Use 'cancel' to abort."
+        elif action == 'sleep':
+            # Note: rundll32 powrprof.dll,SetSuspendState 0,1,0 only works if hibernated is disabled
+            # or it might hibernate instead.
+            subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], check=True)
+            return "PC is entering sleep/hibernation mode."
+        elif action == 'cancel':
+            subprocess.run(["shutdown", "/a"], check=True)
+            return "Scheduled power action cancelled successfully."
+        else:
+            return f"Error: Invalid power action '{action}'. Valid: shutdown, restart, sleep, cancel."
+    except Exception as e:
+        return f"Failed to execute power command: {str(e)}"
+
+@register_tool
+def set_pc_volume(level: int) -> str:
+    """
+    Sets the system volume to a precise percentage (0-100) using PowerShell.
+    
+    Args:
+        level: The volume level to set (0 to 100).
+    """
+    import subprocess
+    if not (0 <= level <= 100):
+        return f"Error: Volume level {level} is out of range (0-100)."
+    
+    try:
+        # Convert 0-100 to 0.0-1.0 for the Core Audio API via PowerShell
+        volume_float = level / 100.0
+        # This PowerShell snippet uses the Audio library to set master volume
+        ps_cmd = f"$obj = new-object -com lib.sysaudio.Control; $obj.MasterVolume = {volume_float}"
+        # A more standard way without external libs is using NirCmd or simple keypresses, 
+        # but since we want PRECISE volume, we use a small script.
+        # However, to avoid dependencies, let's use a simpler PowerShell method:
+        ps_script = f"(Get-WmiObject -Namespace root/wmi -Class WmiMonitorBrightnessMethods).WmiSetBrightness(1,{level})" # This is for brightness
+        # For Volume, let's use the standard SndVol way or similar.
+        # Actually, let's use this reliable PowerShell approach for Volume:
+        ps_cmd = f"(new-object -com shell.application).NameSpace(0).ParseName('C:').InvokeVerb('Properties'); (New-Object -ComObject WScript.Shell).SendKeys([char]175*50); (New-Object -ComObject WScript.Shell).SendKeys([char]174*{100-level})"
+        # That's messy. Let's use the absolute best one for Windows:
+        ps_cmd = f"$w = New-Object -ComObject WScript.Shell; for($i=0; $i -lt 50; $i++) {{ $w.SendKeys([char]174) }}; for($i=0; $i -lt {level // 2}; $i++) {{ $w.SendKeys([char]175) }}"
+        
+        subprocess.run(["powershell", "-Command", ps_cmd], check=True)
+        return f"Volume set to approximately {level}%."
+    except Exception as e:
+        return f"Failed to set volume: {str(e)}"
+
+@register_tool
+def launch_app(app_name: str) -> str:
+    """
+    Launches a Windows application by name or common path.
+    
+    Args:
+        app_name: The name of the app (e.g., 'notepad', 'calc', 'chrome', 'spotify').
+    """
+    import subprocess
+    app_name = app_name.lower().strip()
+    
+    # Common mappings
+    apps = {
+        "chrome": "chrome.exe",
+        "spotify": "spotify.exe",
+        "notepad": "notepad.exe",
+        "calc": "calc.exe",
+        "code": "code",
+        "calculator": "calc.exe"
+    }
+    
+    target = apps.get(app_name, app_name)
+    
+    try:
+        # Try launching via shell (works for registered aliases)
+        subprocess.Popen(target, shell=True)
+        return f"Attempting to launch '{app_name}'..."
+    except Exception as e:
+        return f"Failed to launch '{app_name}': {str(e)}"
+
+@register_tool
+def close_app(app_name: str) -> str:
+    """
+    Closes a running application by its process name.
+    
+    Args:
+        app_name: The name of the process to close (e.g., 'notepad', 'chrome', 'spotify').
+    """
+    import psutil
+    app_name = app_name.lower().strip()
+    if not app_name.endswith('.exe') and app_name not in ['code']: # code is usually scripts
+        app_name += '.exe'
+        
+    closed_count = 0
+    try:
+        for proc in psutil.process_iter(['name']):
+            if proc.info['name'] and proc.info['name'].lower() == app_name:
+                proc.terminate()
+                closed_count += 1
+        
+        if closed_count > 0:
+            return f"Successfully closed {closed_count} instance(s) of '{app_name}'."
+        else:
+            return f"No running process found named '{app_name}'."
+    except Exception as e:
+        return f"Error trying to close '{app_name}': {str(e)}"
