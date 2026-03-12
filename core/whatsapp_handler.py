@@ -35,8 +35,8 @@ def handle_incoming_message(msg_data: dict):
     contact_name = contact["name"] if contact and contact["name"] else "Unknown Contact"
     rules = contact["rules"] if contact and contact["rules"] else "Be helpful and conversational."
 
-    # Get the last 20 messages for context
-    history = database.get_wa_history(sender, limit=20)
+    # Get the last 40 messages for context (to avoid cutting off tool turns)
+    history = database.get_wa_history(sender, limit=40)
 
     # 4. Generate AI Reply
     settings = database.load_settings()
@@ -127,7 +127,8 @@ def handle_incoming_message(msg_data: dict):
                 m["name"] = msg["name"]
             messages.append(m)
         
-        # Capture input count BEFORE AI call to slice new turns correctly
+        # Snapshot messages BEFORE AI call to recover clean history if it crashes mid-turn
+        history_snapshot = list(messages)
         input_count = len(messages)
         
         # DEBUG: See exactly what we send to DeepSeek
@@ -151,9 +152,8 @@ def handle_incoming_message(msg_data: dict):
         # Use repr(e) or safe string to avoid encoding issues in Windows terminal
         print(f"AI Generation Error: {str(e).encode('ascii', errors='replace').decode('ascii')}")
         reply_text = "Sorry, my brain went offline for a second! Try again."
-        # result for error case
-        result = {"reply": reply_text, "history": messages + [{"role": "assistant", "content": reply_text}]}
-        input_count = len(messages) # Ensure slice logic still works
+        # result for error case: Use history_snapshot to avoid saving unfulfilled tool_calls
+        result = {"reply": reply_text, "history": history_snapshot + [{"role": "assistant", "content": reply_text}]}
 
     # 5. Save all new intermediate messages (tool calls, tool results, final reply)
     new_messages = result.get("history", [])[input_count:]
