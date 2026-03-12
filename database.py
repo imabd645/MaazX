@@ -298,5 +298,20 @@ def clear_wa_history(phone_number: str = None):
     conn.commit()
     conn.close()
 
+def delete_wa_latest_messages(phone_number: str, count: int):
+    """Delete the last N messages for a specific contact."""
+    conn = _get_conn()
+    conn.execute("""
+        DELETE FROM whatsapp_messages 
+        WHERE id IN (
+            SELECT id FROM whatsapp_messages 
+            WHERE phone_number = ? 
+            ORDER BY id DESC 
+            LIMIT ?
+        )
+    """, (phone_number, count))
+    conn.commit()
+    conn.close()
+
 # Initialize DB on import
 init_db()
