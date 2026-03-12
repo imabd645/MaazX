@@ -51,3 +51,9 @@ Thumbs.db
 # ChromaDB / Indexer Storage
 chroma_db/
 codebase_index/
+.chroma/
+
+# Secrets & Credentials
+credentials.json
+agent_secrets.env
+.gemini/
