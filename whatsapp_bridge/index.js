@@ -79,15 +79,40 @@ client.on('message', async msg => {
     try {
         console.log(`[Incoming] ${msg.from}: ${msg.body}`);
 
+        // Media Handling
+        let mediaPath = null;
+        if (msg.hasMedia) {
+            try {
+                const media = await msg.downloadMedia();
+                if (media) {
+                    const mediaDir = './media_inbox';
+                    if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir);
+
+                    const filename = msg.id.id + (media.filename ? '_' + media.filename : '');
+                    // For safety, remove some special characters from filename
+                    const safeFilename = filename.replace(/[^a-z0-9.]/gi, '_').substring(0, 50);
+                    const ext = media.mimetype.split('/')[1] || 'bin';
+                    let finalFilename = safeFilename;
+                    if (!finalFilename.includes('.')) finalFilename += '.' + ext;
+
+                    mediaPath = require('path').resolve(mediaDir, finalFilename);
+                    fs.writeFileSync(mediaPath, Buffer.from(media.data, 'base64'));
+                    console.log(`[Media] Saved to: ${mediaPath}`);
+                }
+            } catch (mediaErr) {
+                console.error('Error downloading media:', mediaErr.message);
+            }
+        }
+
         // Forward the message to our Python agent backend
-        // Assume Flask runs on port 5000
         await axios.post('http://127.0.0.1:5000/api/whatsapp/incoming', {
             id: msg.id._serialized,
             from: msg.from,
             author: msg.author || msg.from,
             body: msg.body,
             timestamp: msg.timestamp,
-            hasMedia: msg.hasMedia
+            hasMedia: msg.hasMedia,
+            mediaPath: mediaPath
         });
 
     } catch (err) {

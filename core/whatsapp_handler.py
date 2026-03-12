@@ -24,6 +24,32 @@ def handle_incoming_message(msg_data: dict):
     # 1. Save incoming message to SQLite
     database.save_wa_message(sender, "user", body)
 
+    # 1a. Handle Incoming Media (File Porter: pc_receive_file)
+    media_path = msg_data.get("media_path")
+    if media_path:
+        import os
+        import shutil
+        try:
+            # Determine path to Downloads
+            downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+            inbox_path = os.path.join(downloads_path, "WhatsApp_Inbox")
+            os.makedirs(inbox_path, exist_ok=True)
+            
+            filename = os.path.basename(media_path)
+            dest_path = os.path.join(inbox_path, filename)
+            
+            # Move the file
+            shutil.move(media_path, dest_path)
+            print(f"[File Porter] Saved incoming file to: {dest_path}")
+            
+            # Adjust the body so the AI knows a file was received
+            if not body:
+                body = f"[RECEIVED FILE: {filename}]"
+            else:
+                body = f"{body} [RECEIVED FILE: {filename}]"
+        except Exception as e:
+            print(f"[File Porter] Error saving incoming file: {e}")
+
     # 2. Retrieve Contact Rules and History
     contact = database.get_wa_contact(sender)
     
