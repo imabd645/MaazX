@@ -83,13 +83,17 @@ def handle_incoming_message(msg_data: dict):
         - To browse files: use 'list_directory' or 'search_files'.
         - To edit code: use 'edit_file' or 'patch_file'.
         - To execute: use 'run_command'.
+        - To schedule: 
+            - For one-time tasks (Today/Tomorrow): ALWAYS use 'schedule_once(prompt, run_at, description)' with YYYY-MM-DD HH:MM:SS.
+            - For recurring tasks: use 'schedule_action' (CRON). NOTE: 0=Monday, 6=Sunday.
         
         SPECIFIC INSTRUCTIONS:
         1. FORWARDING MESSAGES: If Admin says "Send X to Name", call 'send_whatsapp' immediately.
         2. CONTACT RESOLUTION: If the name is known in history (e.g. "Mama", "Hamna"), use that name in the tool.
-        3. NO FLUFF: Do not say "Okay", "I will do that", or "Sure". Just trigger the tool.
-        4. VERIFICATION: Briefly confirm the result ONLY after the tool returns.
-        5. FORMATTING: Use PLAIN TEXT ONLY. NO MARKDOWN (no stars, no underscores).
+        3. SCHEDULING: Preference is 'schedule_once'. Ensure 'run_at' uses 24h format and the current year (2026).
+        4. NO FLUFF: Do not say "Okay", "I will do that", or "Sure". Just trigger the tool.
+        5. VERIFICATION: Briefly confirm the result ONLY after the tool returns.
+        6. FORMATTING: Use PLAIN TEXT ONLY. NO MARKDOWN (no stars, no underscores).
         """
         permitted_tools = None # Admin gets everything
     else:
@@ -115,7 +119,7 @@ def handle_incoming_message(msg_data: dict):
     reply_text = "I'm sorry, I encountered an error processing your message."
 
     try:
-        # Build message history for DeepSeek
+        # 4. Build message history for DeepSeek
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history:
             m = {"role": msg["role"], "content": msg["content"]}
@@ -126,7 +130,30 @@ def handle_incoming_message(msg_data: dict):
             if msg.get("name"):
                 m["name"] = msg["name"]
             messages.append(m)
-        
+
+        # --- SELF-HEALING HISTORY LOGIC ---
+        cleaned_messages = []
+        for i, m in enumerate(messages):
+            if m["role"] == "assistant" and m.get("tool_calls"):
+                call_ids = [tc.get("id") for tc in m["tool_calls"]]
+                found_ids = set()
+                for j in range(i + 1, len(messages)):
+                    if messages[j]["role"] == "tool":
+                        found_ids.add(messages[j].get("tool_call_id"))
+                    else:
+                        break
+                if not all(cid in found_ids for cid in call_ids):
+                    print(f"[WA Debug] Cleaning orphaned tool_calls from assistant message at index {i}")
+                    new_m = m.copy()
+                    del new_m["tool_calls"]
+                    if not new_m.get("content"):
+                        new_m["content"] = "Executed some tools."
+                    cleaned_messages.append(new_m)
+                    continue
+            cleaned_messages.append(m)
+        messages = cleaned_messages
+        # ----------------------------------
+
         # Snapshot messages BEFORE AI call to recover clean history if it crashes mid-turn
         history_snapshot = list(messages)
         input_count = len(messages)

@@ -173,11 +173,18 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
 
         elif name == "schedule_action":
             tool_schema["function"]["parameters"]["properties"] = {
-                "prompt": {"type": "string", "description": "Instruction to run later"},
+                "prompt": {"type": "string", "description": "Instruction for the future agent"},
                 "cron_expression": {"type": "string", "description": "5-part cron string"},
-                "description": {"type": "string", "description": "Job name"}
+                "description": {"type": "string", "description": "Human label for the task"}
             }
             tool_schema["function"]["parameters"]["required"] = ["prompt", "cron_expression", "description"]
+        elif name == "schedule_once":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "prompt": {"type": "string", "description": "Instruction for the future agent"},
+                "run_at": {"type": "string", "description": "Date/Time in YYYY-MM-DD HH:MM:SS format"},
+                "description": {"type": "string", "description": "Human label for the task"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["prompt", "run_at", "description"]
 
         elif name == "get_database_schema":
             tool_schema["function"]["parameters"]["properties"] = {
@@ -216,6 +223,27 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             tool_schema["function"]["parameters"]["properties"] = {
                 "phone_number": {"type": "string", "description": "Optional WhatsApp ID to clear"}
             }
+
+        elif name == "trim_whatsapp_history":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "count": {"type": "integer", "description": "Number of recent messages to delete"},
+                "phone_number": {"type": "string", "description": "The WhatsApp ID to trim (REQUIRED)"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["count", "phone_number"]
+
+        # ── Git Tools ──
+        elif name == "git_sync":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "message": {"type": "string", "description": "Optional commit message"}
+            }
+        elif name == "get_git_diff":
+            tool_schema["function"]["parameters"]["properties"] = {}
+        elif name == "create_github_issue":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "title": {"type": "string", "description": "Title of the issue"},
+                "body": {"type": "string", "description": "Body/Description of the issue"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["title", "body"]
 
         # ── Gmail Tools ──
         elif name == "gmail_search_emails":
