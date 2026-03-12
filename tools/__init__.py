@@ -47,3 +47,9 @@ import tools.system_monitor
 
 # Git Manager
 import tools.git_manager
+
+# Webcam Control
+import tools.webcam
+
+# File Porter
+import tools.file_transfer
