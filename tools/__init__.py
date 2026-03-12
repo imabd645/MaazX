@@ -38,3 +38,6 @@ import tools.query_knowledge
 
 # Gmail Integration
 import tools.gmail
+
+# PC Control
+import tools.pc_control
