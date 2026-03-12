@@ -209,6 +209,11 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
                 "app_name": {"type": "string", "description": "Name of the app/process to close"}
             }
             tool_schema["function"]["parameters"]["required"] = ["app_name"]
+        elif name == "spotify_search":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "query": {"type": "string", "description": "The song, artist, or album to search and auto-play"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["query"]
             
         # ── Git Tools ──
         elif name == "get_database_schema":
