@@ -49,12 +49,13 @@ def control_media(action: str) -> str:
     return f"Successfully sent media key command: {action}"
 
 @register_tool
-def take_screenshot(filename: str = None) -> str:
+def take_screenshot(filename: str = None, send_to_whatsapp: str = None) -> str:
     """
     Takes a screenshot of the primary Windows desktop and saves it to the media folder.
     
     Args:
         filename: Optional. The name of the file to save (e.g., 'shot1.png'). If None, an auto-timestamped name is used.
+        send_to_whatsapp: Optional. A WhatsApp phone number or ID (e.g., '923350806140' or '923350806140@c.us'). If provided, the screenshot will be sent directly to this contact.
     """
     try:
         from PIL import ImageGrab
@@ -79,7 +80,27 @@ def take_screenshot(filename: str = None) -> str:
         img = ImageGrab.grab(all_screens=True)
         img.save(filepath)
         
-        return f"Screenshot successfully taken and saved to: {filepath}"
+        result_msg = f"Screenshot successfully taken and saved to: {filepath}"
+        
+        # If requested, forward the image to WhatsApp
+        if send_to_whatsapp:
+            import requests
+            try:
+                payload = {
+                    "to": send_to_whatsapp,
+                    "filePath": filepath,
+                    "caption": "Screenshot taken by Agent."
+                }
+                # Call our new Node.js bridge endpoint
+                resp = requests.post("http://localhost:3000/send_media", json=payload, timeout=10)
+                if resp.status_code == 200:
+                    result_msg += f"\nAnd successfully sent to WhatsApp contact: {send_to_whatsapp}"
+                else:
+                    result_msg += f"\nFailed to send to WhatsApp. Bridge returned: {resp.text}"
+            except Exception as bridge_err:
+                result_msg += f"\nFailed to contact WhatsApp bridge: {str(bridge_err)}"
+                
+        return result_msg
     except Exception as e:
         return f"Error taking screenshot: {str(e)}"
 
