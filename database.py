@@ -262,7 +262,7 @@ def save_wa_message(phone_number: str, role: str, content: str, tool_calls: list
     conn.commit()
     conn.close()
 
-def get_wa_history(phone_number: str, limit: int = 40):
+def get_wa_history(phone_number: str, limit: int = 100):
     """Return the most recent messages for a contact, in chronological order."""
     conn = _get_conn()
     # Get latest messages first (DESC) then reverse them for the LLM (ASC order)
@@ -280,7 +280,7 @@ def get_wa_history(phone_number: str, limit: int = 40):
             "content": row["content"],
             "timestamp": row["timestamp"]
         }
-        if row["tool_calls"]:
+        if row["tool_calls"] and row["tool_calls"] != "[]":
             msg["tool_calls"] = json.loads(row["tool_calls"])
         if row["tool_call_id"]:
             msg["tool_call_id"] = row["tool_call_id"]
