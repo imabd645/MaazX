@@ -194,6 +194,21 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
                 "action": {"type": "string", "enum": ["shutdown", "restart", "sleep", "cancel"]}
             }
             tool_schema["function"]["parameters"]["required"] = ["action"]
+        elif name == "set_pc_volume":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "level": {"type": "integer", "description": "Volume level (0-100)"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["level"]
+        elif name == "launch_app":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "app_name": {"type": "string", "description": "Name of the app to launch"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["app_name"]
+        elif name == "close_app":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "app_name": {"type": "string", "description": "Name of the app/process to close"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["app_name"]
             
         # ── Git Tools ──
         elif name == "get_database_schema":
