@@ -327,6 +327,32 @@
                                     <span class="setting-hint">Overrides .env/config if set</span>
                                 </div>
 
+                                <div class="setting-group">
+                                    <label class="setting-label">Vision Provider</label>
+                                    <select class="setting-input" id="setting-vision-provider">
+                                        <option value="ollama">Ollama (Local - Private & Free)</option>
+                                        <option value="google_cloud">Google Cloud Vision (Paid)</option>
+                                    </select>
+                                    <span class="setting-hint">Choose how the agent "sees" images</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">Local Vision Model</label>
+                                    <select class="setting-input" id="setting-vision-model">
+                                        <option value="moondream">Moondream (Fast & Light)</option>
+                                        <option value="llava">LLaVA (Full Vision)</option>
+                                    </select>
+                                    <span class="setting-hint">Model used for local analysis</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">Google Vision Key Path (JSON)</label>
+                                    <input type="text" class="setting-input" id="setting-vision-path"
+                                        placeholder="C:\keys\vision-auth.json">
+                                    <span class="setting-hint">Absolute path to your Google Cloud Service Account
+                                        JSON</span>
+                                </div>
+
                                 <div class="setting-group"
                                     style="margin-top: 25px; border-top: 1px solid var(--border); padding-top: 15px;">
                                     <label class="setting-label">WhatsApp Owner Name</label>
