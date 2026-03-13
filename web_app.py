@@ -153,7 +153,11 @@ def api_chat():
             result = deepseek_client.chat_completion_with_tools(
                 messages=msgs,
                 model_name=current_model,
-                allow_tools=allow_tools
+                allow_tools=allow_tools,
+                context_params={
+                    "user_id": "global",
+                    "is_admin": True
+                }
             )
             
             reply_text = result["reply"]

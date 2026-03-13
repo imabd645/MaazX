@@ -6,28 +6,28 @@ from core.tool_registry import register_tool
 import database as db
 
 @register_tool
-def remember_fact(key: str, value: str) -> str:
+def remember_fact(key: str, value: str, user_id: str = "global") -> str:
     """
     Saves a persistent memory or preference about the user into the SQLite database.
-    This will be injected into every future chat session automatically.
+    This will be isolated to the current user.
 
     Args:
-        key: A short, descriptive identifier for this memory (e.g., 'preferred_framework', 'user_name').
+        key: A short, descriptive identifier for this memory.
         value: The value or context of the memory to save.
     """
-    db.save_memory(key, value)
+    db.save_memory(key, value, user_id=user_id)
     return f"Memory saved successfully! I will remember that '{key}' is: {value}"
 
 
 @register_tool
-def forget_fact(key: str) -> str:
+def forget_fact(key: str, user_id: str = "global") -> str:
     """
     Deletes a specific memory from the database.
 
     Args:
         key: The exact key of the memory to delete.
     """
-    deleted = db.delete_memory(key)
+    deleted = db.delete_memory(key, user_id=user_id)
     if deleted:
         return f"Successfully forgot the memory associated with '{key}'."
     else:
@@ -35,16 +35,40 @@ def forget_fact(key: str) -> str:
 
 
 @register_tool
-def list_memories() -> str:
+def set_global_instruction(key: str, value: str, is_admin: bool = False) -> str:
     """
-    Lists all saved user memories and preferences from the database.
-    Returns a formatted string of key-value pairs.
+    [ADMIN ONLY] Sets a universal fact or instruction that applies to ALL users.
+    Example: 'creator', 'Abdullah Masood'.
     """
-    memories = db.get_memories()
-    if not memories:
+    if not is_admin:
+        return "ERROR: Only admins can set global instructions."
+    
+    db.save_memory(key, value, user_id="global")
+    return f"Global Instruction set: '{key}' is now universally set to: {value}"
+
+
+@register_tool
+def list_memories(user_id: str = "global", is_admin: bool = False) -> str:
+    """
+    Lists saved user memories. 
+    Admins see global + personal. Users see ONLY personal.
+    """
+    # 1. Fetch personal + global
+    all_memories = db.get_memories(user_id=user_id, include_global=True)
+    
+    # 2. Filter for visibility logic
+    if not is_admin:
+        # Hide global keys from listing for regular users
+        global_keys = db.get_memories(user_id="global", include_global=False).keys()
+        display_mems = {k: v for k, v in all_memories.items() if k not in global_keys}
+    else:
+        display_mems = all_memories
+
+    if not display_mems:
         return "You have no saved memories."
     
     output = "Here are your saved memories:\n"
-    for k, v in memories.items():
-        output += f"- {k}: {v}\n"
+    for k, v in display_mems.items():
+        prefix = "[GLOBAL] " if is_admin and k in db.get_memories(user_id="global", include_global=False) else ""
+        output += f"- {prefix}{k}: {v}\n"
     return output
