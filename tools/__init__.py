@@ -53,3 +53,6 @@ import tools.webcam
 
 # File Porter
 import tools.file_transfer
+
+# Browser Automation
+import tools.browser_automation
