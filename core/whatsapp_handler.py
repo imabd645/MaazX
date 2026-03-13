@@ -64,6 +64,9 @@ def handle_incoming_message(msg_data: dict):
     # Get the last 40 messages for context (to avoid cutting off tool turns)
     history = database.get_wa_history(sender, limit=40)
 
+    # 3. Retrieve Personal + Global Memories
+    memories = database.get_memories(user_id=sender, include_global=True)
+
     # 4. Generate AI Reply
     settings = database.load_settings()
     model_name = settings.get("model_name", "gemini-2.5-flash")
@@ -116,6 +119,8 @@ def handle_incoming_message(msg_data: dict):
         - To browse files: use 'list_directory' or 'search_files'.
         - To edit code: use 'edit_file' or 'patch_file'.
         - To execute: use 'run_command'.
+        - To analyze screen: use 'analyze_screenshot(query)'. (HIGH FIDELITY VISION)
+        - To analyze images: use 'analyze_image_vision(image_path, query)'.
         - To schedule: 
             - For one-time tasks (Today/Tomorrow): ALWAYS use 'schedule_once(prompt, run_at, description)' with YYYY-MM-DD HH:MM:SS.
             - For recurring tasks: use 'schedule_action' (CRON). NOTE: 0=Monday, 6=Sunday.
@@ -126,7 +131,8 @@ def handle_incoming_message(msg_data: dict):
         3. SCHEDULING: Preference is 'schedule_once'. Ensure 'run_at' uses 24h format and the current year (2026).
         4. NO FLUFF: Do not say "Okay", "I will do that", or "Sure". Just trigger the tool.
         5. VERIFICATION: Briefly confirm the result ONLY after the tool returns.
-        6. FORMATTING: Use PLAIN TEXT ONLY. NO MARKDOWN (no stars, no underscores).
+        6. VISION: You have full access to Google Cloud Vision. If the Admin asks to "see", "look", or "analyze" the screen, ALWAYS use 'analyze_screenshot'. Never say it is not configured.
+        7. FORMATTING: Use PLAIN TEXT ONLY. NO MARKDOWN (no stars, no underscores).
         """
         permitted_tools = None # Admin gets everything
     else:
@@ -170,28 +176,58 @@ def handle_incoming_message(msg_data: dict):
                 m["name"] = msg["name"]
             messages.append(m)
 
-        # --- SELF-HEALING HISTORY LOGIC ---
+        # --- STRICT SELF-HEALING HISTORY LOGIC ---
+        # DeepSeek/OpenAI requirement:
+        # 1. 'tool' messages must follow an 'assistant' message with 'tool_calls'.
+        # 2. 'assistant' messages with 'tool_calls' must be followed by 'tool' messages.
+        
         cleaned_messages = []
-        for i, m in enumerate(messages):
+        i = 0
+        while i < len(messages):
+            m = messages[i]
+            
+            # Case 1: Assistant with tool calls
             if m["role"] == "assistant" and m.get("tool_calls"):
                 call_ids = [tc.get("id") for tc in m["tool_calls"]]
-                found_ids = set()
-                for j in range(i + 1, len(messages)):
-                    if messages[j]["role"] == "tool":
-                        found_ids.add(messages[j].get("tool_call_id"))
-                    else:
-                        break
-                if not all(cid in found_ids for cid in call_ids):
-                    print(f"[WA Debug] Cleaning orphaned tool_calls from assistant message at index {i}")
+                
+                # Look ahead for matching tool results
+                tool_results = []
+                j = i + 1
+                while j < len(messages) and messages[j]["role"] == "tool":
+                    tool_results.append(messages[j])
+                    j += 1
+                
+                found_ids = [tr.get("tool_call_id") for tr in tool_results]
+                
+                # Check if ALL tool calls have a result
+                if all(cid in found_ids for cid in call_ids):
+                    # Chain is complete, keep it
+                    cleaned_messages.append(m)
+                    cleaned_messages.extend(tool_results)
+                    i = j # Skip to after tool results
+                else:
+                    # Broken chain! Strip tool_calls from assistant and ignore the tool results
+                    print(f"[WA Debug] Cleaning broken tool chain at index {i}")
                     new_m = m.copy()
                     del new_m["tool_calls"]
                     if not new_m.get("content"):
-                        new_m["content"] = "Executed some tools."
+                        new_m["content"] = "Attempting to help..." # Tool-only messages need text if stripped
                     cleaned_messages.append(new_m)
-                    continue
+                    i = j # Skip the orphaned tool results
+                continue
+            
+            # Case 2: Orphaned Tool message (no preceding assistant with tool_calls)
+            if m["role"] == "tool":
+                print(f"[WA Debug] Dropping orphaned tool message at index {i}")
+                i += 1
+                continue
+                
+            # Case 3: Normal message
             cleaned_messages.append(m)
+            i += 1
+            
         messages = cleaned_messages
-        # ----------------------------------
+        # ------------------------------------------
 
         # Snapshot messages BEFORE AI call to recover clean history if it crashes mid-turn
         history_snapshot = list(messages)
