@@ -165,11 +165,24 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             }
             tool_schema["function"]["parameters"]["required"] = ["url"]
 
+        elif name == "analyze_image_vision":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "image_path": {"type": "string", "description": "Absolute path to the image file"},
+                "query": {"type": "string", "description": "Optional: Specific question about the image (e.g. 'What is the total price on this receipt?')"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["image_path"]
+
         elif name == "take_screenshot":
             tool_schema["function"]["parameters"]["properties"] = {
                 "filename": {"type": "string", "description": "Optional name for the file (e.g. 'desktop.png')"},
                 "send_to_whatsapp": {"type": "string", "description": "Optional: Phone number or WhatsApp ID to send the image to immediately after capture"}
             }
+
+        elif name == "analyze_screenshot":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "query": {"type": "string", "description": "What to look for or analyze on the screen (e.g. 'What is the error on the terminal?')"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["query"]
 
         elif name == "send_whatsapp":
             tool_schema["function"]["parameters"]["properties"] = {
