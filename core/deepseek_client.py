@@ -222,6 +222,30 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             }
             tool_schema["function"]["parameters"]["required"] = ["filename", "contact"]
             
+        elif name == "browser_automate":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "enum": ["navigate", "click", "type", "wait", "screenshot"]},
+                            "url": {"type": "string"},
+                            "selector": {"type": "string"},
+                            "text": {"type": "string"},
+                            "ms": {"type": "integer"},
+                            "send_to_whatsapp": {"type": "string"}
+                        },
+                        "required": ["type"]
+                    }
+                }
+            }
+            tool_schema["function"]["parameters"]["required"] = ["actions"]
+        elif name == "browser_screenshot":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "send_to_whatsapp": {"type": "string", "description": "Optional WhatsApp ID to send the shot to"}
+            }
+            
         elif name == "spotify_search":
             tool_schema["function"]["parameters"]["properties"] = {
                 "query": {"type": "string", "description": "The song, artist, or album to search and auto-play"}
