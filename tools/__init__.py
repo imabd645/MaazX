@@ -56,3 +56,6 @@ import tools.file_transfer
 
 # Browser Automation
 import tools.browser_automation
+
+# Vision Intelligence
+import tools.vision_intelligence

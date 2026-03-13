@@ -88,6 +88,9 @@ DEFAULT_SETTINGS = {
     "deepseek_api_key": "",
     "wa_admin_numbers": "",
     "wa_owner_name": "User",
+    "google_vision_key_path": "",
+    "vision_provider": "ollama",
+    "vision_model": "moondream"
 }
 
 
