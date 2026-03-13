@@ -97,6 +97,13 @@ def handle_incoming_message(msg_data: dict):
         WORKING DIRECTORY: {database.load_settings().get('cwd', 'Default')}
         
         ------------------------------------------------------------
+        USER CONTEXT & MEMORIES:
+        ------------------------------------------------------------
+        - Person you are talking to: {contact_name} ({sender})
+        - Personal Facts about them: {json.dumps({k:v for k,v in memories.items() if k not in database.get_memories('global', False)})}
+        - Global Instructions/Facts: {json.dumps(database.get_memories('global', False))}
+        
+        ------------------------------------------------------------
         GOLDEN RULE: NEVER HALLUCINATE ACTION
         ------------------------------------------------------------
         - If the Admin asks for an action (Send, Search, Delete, Edit, Run), you MUST call a tool.
@@ -128,6 +135,12 @@ def handle_incoming_message(msg_data: dict):
         You are an AI assistant managing WhatsApp for {owner_name}.
         You are talking to: {contact_name} ({sender}).
         Rules: {rules}
+        
+        ------------------------------------------------------------
+        USER CONTEXT & MEMORIES:
+        ------------------------------------------------------------
+        - Personal Facts about {contact_name}: {json.dumps({k:v for k,v in memories.items() if k not in database.get_memories('global', False)})}
+        - Global Instructions (Universal Truths): {json.dumps(database.get_memories('global', False))}
         
         ------------------------------------------------------------
         STRICT OPERATING PROCEDURES
@@ -192,7 +205,11 @@ def handle_incoming_message(msg_data: dict):
             messages=messages,
             model_name=model_name,
             allow_tools=True, 
-            permitted_tools=permitted_tools
+            permitted_tools=permitted_tools,
+            context_params={
+                "user_id": sender,
+                "is_admin": is_admin
+            }
         )
         reply_text = result["reply"]
         

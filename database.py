@@ -64,9 +64,11 @@ def init_db():
         );
 
         CREATE TABLE IF NOT EXISTS memories (
-            id    INTEGER PRIMARY KEY AUTOINCREMENT,
-            key   TEXT UNIQUE NOT NULL,
-            value TEXT NOT NULL
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL DEFAULT 'global',
+            key     TEXT NOT NULL,
+            value   TEXT NOT NULL,
+            UNIQUE(user_id, key)
         );
     """)
     conn.commit()
@@ -119,29 +121,45 @@ def save_settings(settings: dict):
 
 
 # ── Agent Memory ────────────────────────────────────────────
-def save_memory(key: str, value: str):
-    """Save a memory fact about the user."""
+def save_memory(key: str, value: str, user_id: str = "global"):
+    """Save a memory fact about a specific user or global context."""
     conn = _get_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO memories (key, value) VALUES (?, ?)",
-        (key, value),
+        "INSERT OR REPLACE INTO memories (user_id, key, value) VALUES (?, ?, ?)",
+        (user_id, key, value),
     )
     conn.commit()
     conn.close()
 
 
-def get_memories() -> dict:
-    """Get all saved memory facts."""
+def get_memories(user_id: str = "global", include_global: bool = True) -> dict:
+    """
+    Get saved memory facts. 
+    If include_global is True, merges global memories with user-specific ones.
+    User-specific keys override global ones if they clash.
+    """
     conn = _get_conn()
-    rows = conn.execute("SELECT key, value FROM memories").fetchall()
+    memories = {}
+    
+    # 1. Load Global
+    if include_global and user_id != "global":
+        rows = conn.execute("SELECT key, value FROM memories WHERE user_id = 'global'").fetchall()
+        for row in rows:
+            memories[row["key"]] = row["value"]
+            
+    # 2. Load User-Specific (overwrites global if duplicate key)
+    rows = conn.execute("SELECT key, value FROM memories WHERE user_id = ?", (user_id,)).fetchall()
+    for row in rows:
+        memories[row["key"]] = row["value"]
+        
     conn.close()
-    return {row["key"]: row["value"] for row in rows}
+    return memories
 
 
-def delete_memory(key: str) -> bool:
-    """Delete a saved memory. Returns True if deleted."""
+def delete_memory(key: str, user_id: str = "global") -> bool:
+    """Delete a saved memory for a specific user."""
     conn = _get_conn()
-    cursor = conn.execute("DELETE FROM memories WHERE key = ?", (key,))
+    cursor = conn.execute("DELETE FROM memories WHERE key = ? AND user_id = ?", (key, user_id))
     conn.commit()
     deleted = cursor.rowcount > 0
     conn.close()
