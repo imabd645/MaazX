@@ -780,6 +780,15 @@ async function loadSettings() {
 
         const elOwner = document.getElementById('setting-wa-owner');
         if (elOwner) elOwner.value = s.wa_owner_name || 'User';
+
+        const elVisionPath = document.getElementById('setting-vision-path');
+        if (elVisionPath) elVisionPath.value = s.google_vision_key_path || '';
+
+        const elVisionProvider = document.getElementById('setting-vision-provider');
+        if (elVisionProvider) elVisionProvider.value = s.vision_provider || 'ollama';
+
+        const elVisionModel = document.getElementById('setting-vision-model');
+        if (elVisionModel) elVisionModel.value = s.vision_model || 'moondream';
     } catch { /* ignore */ }
 }
 
@@ -795,6 +804,9 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         gemini_api_key: document.getElementById('setting-gemini-key')?.value?.trim() || '',
         wa_admin_numbers: document.getElementById('setting-wa-admins')?.value?.trim() || '',
         wa_owner_name: document.getElementById('setting-wa-owner')?.value?.trim() || 'User',
+        google_vision_key_path: document.getElementById('setting-vision-path')?.value?.trim() || '',
+        vision_provider: document.getElementById('setting-vision-provider')?.value || 'ollama',
+        vision_model: document.getElementById('setting-vision-model')?.value || 'moondream',
     };
 
     try {

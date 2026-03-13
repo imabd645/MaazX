@@ -110,42 +110,33 @@ def take_screenshot(filename: str = None, send_to_whatsapp: str = None) -> str:
 @register_tool
 def analyze_screenshot(query: str) -> str:
     """
-    Takes a live screenshot of the desktop and passes it to the Gemini Vision AI 
-    model to answer a specific question about what is currently on the screen.
+    Takes a live screenshot of the desktop and passes it to the Google Cloud Vision API 
+    and DeepSeek for a deep understanding of what is on the screen.
     
     Args:
         query: What to look for or analyze on the screen (e.g., "What is the error on the terminal?", "Is Spotify open?")
     """
-    try:
-        from PIL import ImageGrab
-        import google.generativeai as genai
-    except ImportError:
-        return "Error: Required libraries not found. Ensure Pillow and google-generativeai are installed."
-        
-    import database as db
-    import config
+    from tools.pc_control import take_screenshot
+    from tools.vision_intelligence import analyze_image_vision
+    import os
     
-    settings = db.load_settings()
-    api_key = settings.get("gemini_api_key") or config.GEMINI_API_KEY
-    if not api_key:
-        return "Error: Gemini API key is missing. Required for Vision capabilities."
+    # 1. Take a temporary screenshot
+    media_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "media")
+    temp_path = os.path.join(media_dir, "temp_vision_analysis.png")
+    
+    take_result = take_screenshot(filename="temp_vision_analysis.png")
+    if "Error" in take_result:
+        return take_result
         
+    # 2. Analyze using the Google Vision + DeepSeek pipeline
     try:
-        # 1. Grab image in memory
-        img = ImageGrab.grab(all_screens=True)
-        
-        # 2. Configure Gemini
-        genai.configure(api_key=api_key)
-        
-        # Use gemini-1.5-flash for fast multimodal tasks
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # 3. Request analysis
-        response = model.generate_content([query, img])
-        
-        return f"Screen Analysis Results:\n\n{response.text}"
+        analysis = analyze_image_vision(temp_path, query=query)
+        # Cleanup temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return analysis
     except Exception as e:
-        return f"Error during screen analysis: {str(e)}"
+        return f"Error during upgraded vision analysis: {str(e)}"
 
 @register_tool
 def lock_pc() -> str:
