@@ -118,8 +118,15 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             tool_schema["function"]["parameters"]["required"] = ["key"]
 
         elif name == "list_memories":
-            # No arguments needed
+            # No arguments needed for model
             tool_schema["function"]["parameters"]["properties"] = {}
+            
+        elif name == "set_global_instruction":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "key": {"type": "string", "description": "Short identifier (e.g. 'creator')"},
+                "value": {"type": "string", "description": "The universal instruction or fact"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["key", "value"]
             
         elif name == "patch_file":
             tool_schema["function"]["parameters"]["properties"] = {
@@ -359,7 +366,7 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
     return tools
 
 
-def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None) -> Dict[str, Any]:
+def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None, context_params: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Sends a completion request to DeepSeek.
     If DeepSeek returns tool calls, this function Executes them locally.
@@ -375,6 +382,13 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
     import database
     settings = database.load_settings()
     
+    # Extract context params from messages if present (sent by handlers)
+    context_params = {}
+    if messages and messages[0].get("role") == "system":
+        # We look for a special marker or just rely on the caller passing it
+        # Realistically, we'll update the signature to accept context_params directly.
+        pass
+
     api_key = settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
     if not api_key or api_key == "sk-deepseek-api-key-here":
         raise ValueError("DeepSeek API Key is missing. Please set it in Settings.")
@@ -451,7 +465,18 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             tool_func = get_tool_by_name(fn_name)
             if tool_func:
                 try:
-                    result = tool_func(**fn_args)
+                    # Context Injection Logic
+                    import inspect
+                    sig = inspect.signature(tool_func)
+                    final_args = fn_args.copy()
+                    
+                    if context_params:
+                        if "user_id" in sig.parameters and "user_id" not in final_args:
+                            final_args["user_id"] = context_params.get("user_id", "global")
+                        if "is_admin" in sig.parameters and "is_admin" not in final_args:
+                            final_args["is_admin"] = context_params.get("is_admin", False)
+
+                    result = tool_func(**final_args)
                     result_str = str(result)
                 except Exception as e:
                     result_str = f"Error executing {fn_name}: {str(e)}"
