@@ -45,31 +45,55 @@ const executablePath = browserPaths.find(p => fs.existsSync(p)) || null;
 // Set up the WhatsApp client with LocalAuth so we don't need to scan the QR code every time
 const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './wwebjs_auth' }),
+    webVersionTimerMS: 60000,
+    authTimeoutMs: 60000,
+    webVersion: '2.24.12.54',
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.24.12.54.html',
+    },
     puppeteer: {
         executablePath: executablePath,
-        headless: 'new', // Use newer headless mode if available
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-extensions',
-            '--no-zygote'
+            '--no-zygote',
+            '--dns-servers=8.8.8.8,1.1.1.1',
+            '--proxy-server="direct://"',
+            '--proxy-bypass-list=*',
+            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
     }
 });
 
 client.on('qr', (qr) => {
-    // Save it for the web endpoint
     currentQR = qr;
-
-    // Generate and scan this code with your phone
     console.log('\n--- SCAN THIS QR CODE AT http://localhost:3000/qr ---');
     qrcode.generate(qr, { small: true });
 });
 
+client.on('loading_screen', (percent, message) => {
+    console.log('LOADING SCREEN:', percent, message);
+});
+
+client.on('authenticated', () => {
+    console.log('AUTHENTICATED');
+});
+
+client.on('auth_failure', msg => {
+    console.error('AUTHENTICATION FAILURE', msg);
+});
+
 client.on('ready', () => {
     console.log('WhatsApp connection is READY!');
-    currentQR = null; // clear it out
+    currentQR = null;
+});
+
+client.on('disconnected', (reason) => {
+    console.log('Client was logged out', reason);
 });
 
 client.on('message', async msg => {
