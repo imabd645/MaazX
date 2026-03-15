@@ -1,5 +1,5 @@
 """
-DeepSeek Official API client for the coding agent.
+MaazX (formerly DeepSeek) API client for the coding agent.
 Handles chat completions and automatically executes local Python tools in a loop
 until a final conversational response is returned.
 """
