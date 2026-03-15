@@ -12,6 +12,7 @@ Unlike traditional chat interfaces, MaazX is an **active participant** in your d
 
 The core of MaazX is based on a **perpetual observation-action cycle**. Every user request is processed as a "Goal," and the agent iteratively selects the best tools to achieve it.
 
+
 ### 🔄 The Execution Lifecycle
 1.  **Intent Classification**: MaazX uses a lightweight classifier to determine if a request is purely conversational (Chat Mode) or requires system access (Agent Mode).
 2.  **System Clock Injection**: A dynamic "Master Clock" is injected into every prompt. This ensures the agent is aware of the exact current second, year (2026), and local timezone before proposing any sensitive scheduling action.

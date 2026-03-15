@@ -59,3 +59,6 @@ import tools.browser_automation
 
 # Vision Intelligence
 import tools.vision_intelligence
+
+# LinkedIn Management
+import tools.linkedin_manager

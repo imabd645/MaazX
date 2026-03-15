@@ -272,6 +272,15 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
             }
             tool_schema["function"]["parameters"]["required"] = ["query"]
             
+        # ── LinkedIn Tools ──
+        elif name == "post_to_linkedin":
+            tool_schema["function"]["parameters"]["properties"] = {
+                "content": {"type": "string", "description": "The professional update text to post"}
+            }
+            tool_schema["function"]["parameters"]["required"] = ["content"]
+        elif name == "draft_linkedin_update":
+            tool_schema["function"]["parameters"]["properties"] = {}
+            
         # ── Git Tools ──
         elif name == "get_database_schema":
             tool_schema["function"]["parameters"]["properties"] = {
