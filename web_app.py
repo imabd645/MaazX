@@ -1,5 +1,5 @@
 """
-Web UI for the DeepSeek Coding Agent.
+Web UI for the MaazX Coding Agent.
 Run:  python web_app.py
 """
 

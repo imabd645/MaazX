@@ -1,4 +1,4 @@
-# 🤖 DeepSeek AI Agent v3.2 — Ultra-Detailed Technical Specification
+# 🤖 MaazX AI Agent v3.2 — Ultra-Detailed Technical Specification
 
 > **The Definitive System Documentation**  
 > An autonomous, multi-channel engineering agent powered by DeepSeek-V3, Gemini 2.x, and a specialized tool-calling framework.

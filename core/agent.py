@@ -47,7 +47,7 @@ class Agent:
 
     def repl(self):
         """Interactive read-eval-print loop."""
-        print("\n[Agent] DeepSeek Coding Agent ready!  Type 'exit' to quit.")
+        print("\n[Agent] MaazX Coding Agent ready!  Type 'exit' to quit.")
         print("   I can scan codebases, search files, run commands, and edit code.\n")
 
         while True:
