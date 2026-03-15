@@ -789,6 +789,12 @@ async function loadSettings() {
 
         const elVisionModel = document.getElementById('setting-vision-model');
         if (elVisionModel) elVisionModel.value = s.vision_model || 'moondream';
+
+        const elLLMProvider = document.getElementById('setting-llm-provider');
+        if (elLLMProvider) elLLMProvider.value = s.llm_provider || 'deepseek';
+
+        const elLLMLocalModel = document.getElementById('setting-llm-local-model');
+        if (elLLMLocalModel) elLLMLocalModel.value = s.llm_local_model || 'qwen3:8b';
     } catch { /* ignore */ }
 }
 
@@ -807,6 +813,8 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         google_vision_key_path: document.getElementById('setting-vision-path')?.value?.trim() || '',
         vision_provider: document.getElementById('setting-vision-provider')?.value || 'ollama',
         vision_model: document.getElementById('setting-vision-model')?.value || 'moondream',
+        llm_provider: document.getElementById('setting-llm-provider')?.value || 'deepseek',
+        llm_local_model: document.getElementById('setting-llm-local-model')?.value?.trim() || 'qwen3:8b',
     };
 
     try {

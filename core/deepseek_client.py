@@ -379,74 +379,88 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
     return tools
 
 
+
+def _call_ollama_llm(messages: List[Dict[str, Any]], model: str, tools: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Calls local Ollama API with chat completion.
+    """
+    url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "options": {"temperature": 0.0}
+    }
+    if tools:
+        payload["tools"] = tools
+
+    print(f"[Ollama] API Request (Model: {model})")
+    try:
+        resp = requests.post(url, json=payload, timeout=300)
+        if not resp.ok:
+            print(f"OLLAMA API ERROR {resp.status_code}: {resp.text}")
+            raise RuntimeError(f"Ollama API Error: {resp.status_code}")
+        data = resp.json()
+        return data.get("message", {})
+    except Exception as e:
+        print(f"[Ollama Error] {e}")
+        return {"role": "assistant", "content": f"Ollama Error: {str(e)}"}
+
 def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None, context_params: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Sends a completion request to DeepSeek.
-    If DeepSeek returns tool calls, this function Executes them locally.
-
-    Args:
-        messages: The conversation history.
-        model_name: Name of the model to use.
-        allow_tools: If False, ignores all tools.
-        permitted_tools: Optional list of specific tool names to allow (whitelist).
-    Returns:
-        {"reply": final_text_string, "executed_tools": list_of_dicts}
+    Sends a completion request to the configured LLM provider (DeepSeek or Ollama).
+    Executes tool calls locally and returns the final response.
     """
     import database
     settings = database.load_settings()
     
+    provider = settings.get("llm_provider", "deepseek")
+    local_model = settings.get("llm_local_model", "qwen2.5-coder:7b")
+    
     # Extract context params from messages if present (sent by handlers)
-    context_params = {}
-    if messages and messages[0].get("role") == "system":
-        # We look for a special marker or just rely on the caller passing it
-        # Realistically, we'll update the signature to accept context_params directly.
-        pass
-
-    api_key = settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
-    if not api_key or api_key == "sk-deepseek-api-key-here":
-        raise ValueError("DeepSeek API Key is missing. Please set it in Settings.")
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
+    if not context_params:
+        context_params = {}
 
     schema_tools = build_tool_definitions(whitelist=permitted_tools) if allow_tools else []
-    
     executed_tools_log = []
 
     # Loop allows up to 20 sequential tool calls to prevent infinite loops
     for _ in range(20):
-        payload = {
-            "model": model_name,
-            "messages": messages,
-            "temperature": 0.0,
-        }
-        
-        if schema_tools:
-            payload["tools"] = schema_tools
+        if provider == "ollama":
+            message = _call_ollama_llm(messages, local_model, schema_tools)
+        else:
+            # DeepSeek Cloud
+            api_key = settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
+            if not api_key or api_key == "sk-deepseek-api-key-here":
+                raise ValueError("DeepSeek API Key is missing. Please set it in Settings.")
 
-        print(f"\n[DeepSeek] API Request (Model: {model_name})")
-        # print(f"[Payload] {json.dumps(payload, indent=2)}")
-        
-        resp = requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, timeout=120)
-        
-        if not resp.ok:
-            print(f"DEEPSEEK API ERROR {resp.status_code}: {resp.text}")
-            try:
-                err_data = resp.json()
-                raise RuntimeError(f"DeepSeek API Error: {err_data}")
-            except Exception:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": model_name,
+                "messages": messages,
+                "temperature": 0.0,
+            }
+            if schema_tools:
+                payload["tools"] = schema_tools
+
+            print(f"\n[DeepSeek] API Request (Model: {model_name})")
+            resp = requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, timeout=120)
+            
+            if not resp.ok:
+                print(f"DEEPSEEK API ERROR {resp.status_code}: {resp.text}")
                 resp.raise_for_status()
                 
-        data = resp.json()
-        choice = data.get("choices", [{}])[0]
-        message = choice.get("message", {})
+            data = resp.json()
+            message = data.get("choices", [{}])[0].get("message", {})
         
         # 1. Did the model just reply with text?
         if not message.get("tool_calls"):
             reply_text = message.get("content", "")
-            print(f"[DeepSeek] Text Response: {reply_text[:100]}...")
+            print(f"[{provider.upper()}] Text Response: {reply_text[:100]}...")
             messages.append({"role": "assistant", "content": reply_text})
             return {
                 "reply": reply_text or "Done.",
@@ -455,9 +469,7 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             }
             
         # 2. Model wants to use tools
-        print(f"[DeepSeek] Requested {len(message.get('tool_calls', []))} tools.")
-        # First, append the assistant's tool_calls message to the history 
-        # (required by OpenAI spec before appending the tool responses)
+        print(f"[{provider.upper()}] Requested {len(message.get('tool_calls', []))} tools.")
         messages.append(message)
         
         tool_calls_req = message.get("tool_calls", [])
@@ -468,7 +480,9 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             call_id = tc.get("id", "")
             
             try:
-                fn_args = json.loads(fn.get("arguments", "{}"))
+                fn_args = tc.get("function", {}).get("arguments", "{}")
+                if isinstance(fn_args, str):
+                    fn_args = json.loads(fn_args)
             except Exception:
                 fn_args = {}
                 
