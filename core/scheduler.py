@@ -17,20 +17,37 @@ jobstores = {
 
 scheduler = BackgroundScheduler(jobstores=jobstores)
 
-def execute_scheduled_task(prompt: str):
+def execute_scheduled_task(prompt: str, description: str):
     """
     The function that runs when a cron job fires.
     It spawns a fresh AI Agent instance and gives it the prompt.
     """
+    import sqlite3
+    import datetime
     print(f"\n[Scheduler] WAKING UP TO EXECUTE TASK: {prompt}")
+    status = "running"
+    
     try:
         # Import lazily to avoid circular imports during boot
         from core.agent import Agent
         agent = Agent()
         reply = agent.send(prompt)
         print(f"[Scheduler] ✅ Task completed successfully.\nAgent reply: {reply}")
+        status = "completed"
     except Exception as e:
         print(f"[Scheduler] ❌ Task failed with error: {e}")
+        status = f"failed: {str(e)}"
+    
+    # Log to a persistent history table
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS job_history (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, prompt TEXT, status TEXT, executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cur.execute("INSERT INTO job_history (name, prompt, status) VALUES (?, ?, ?)", (description, prompt, status))
+        conn.commit()
+        conn.close()
+    except Exception as log_err:
+        print(f"[Scheduler] Logging failed: {log_err}")
 
 def start_scheduler():
     """Boots the APScheduler in the background loop."""
@@ -56,8 +73,9 @@ def add_cron_job(prompt: str, minute: str = "*", hour: str = "*", day: str = "*"
     job = scheduler.add_job(
         execute_scheduled_task, 
         trigger=trigger, 
-        args=[prompt],
-        name=description[:50]
+        args=[prompt, description],
+        name=description[:50],
+        id=f"cron_{int(datetime.datetime.now().timestamp())}"
     )
     
     # SAFETY CHECK: If next_run_time is way in the future (e.g. > 1 week), it's likely a cron mismatch
@@ -93,8 +111,9 @@ def add_date_job(prompt: str, run_at: str, description: str = "One-time Task") -
     job = scheduler.add_job(
         execute_scheduled_task,
         trigger=DateTrigger(run_date=dt),
-        args=[prompt],
-        name=description[:50]
+        args=[prompt, description],
+        name=description[:50],
+        id=f"once_{int(datetime.datetime.now().timestamp())}"
     )
     
     return str(job.id)

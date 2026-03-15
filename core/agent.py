@@ -25,6 +25,9 @@ class Agent:
     def send(self, message: str) -> str:
         """Send a user message and return the agent's final text reply."""
         
+        # Always refresh the system message with current time
+        self.messages[0] = {"role": "system", "content": config.get_system_instruction()}
+        
         # Determine intent
         intent = classify_intent(message)
         allow_tools = (intent != "chat")

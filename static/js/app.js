@@ -268,6 +268,7 @@ input.addEventListener('keydown', (e) => {
 sendBtn.addEventListener('click', sendMessage);
 
 /* ── Core send / receive ────────────────────────────────── */
+/* ── Core streaming send / receive ────────────────────────── */
 async function sendMessage() {
     const text = input.value.trim();
     if (!text || isProcessing) return;
@@ -280,33 +281,120 @@ async function sendMessage() {
     input.value = '';
     input.style.height = 'auto';
 
-    const thinkingEl = showThinking();
-    setStatus('thinking');
+    // Create the assistant message container early for streaming (includes thinking dots)
+    const messageObj = appendStreamingMessage('assistant');
+    let fullText = "";
+    let hasStartedText = false;
 
     try {
-        const res = await fetch('/api/chat', {
+        const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: text }),
         });
 
-        const data = await res.json();
-        removeThinking(thinkingEl);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-        if (data.error) {
-            appendMessage('assistant', 'Error: ' + data.error, []);
-        } else {
-            appendMessage('assistant', data.reply, data.tool_calls || []);
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.substring(6));
+
+                        if (data.error) {
+                            updateStreamingMessage(messageObj, 'Error: ' + data.error);
+                        } else if (data.t === 'text') {
+                            if (!hasStartedText) {
+                                hasStartedText = true;
+                                hideThinkingDots(messageObj);
+                            }
+                            fullText += data.c;
+                            updateStreamingMessage(messageObj, fullText);
+                        } else if (data.t === 'tool') {
+                            hideThinkingDots(messageObj); // Also hide if tool starts
+                            addToolBadge(messageObj, data.n, 'pending');
+                        } else if (data.t === 'result') {
+                            updateToolBadge(messageObj, data.n, 'success');
+                        }
+                    } catch (e) {
+                        console.error("Error parsing SSE chunk:", e);
+                    }
+                }
+            }
         }
     } catch (err) {
-        removeThinking(thinkingEl);
-        appendMessage('assistant', 'Network error: ' + err.message, []);
+        updateStreamingMessage(messageObj, 'Network error: ' + err.message);
     }
 
     setStatus('ready');
     isProcessing = false;
     sendBtn.disabled = false;
     input.focus();
+}
+
+function appendStreamingMessage(role) {
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+
+    const name = role === 'user' ? 'You' : 'MaazX';
+    div.innerHTML = `
+        <div class="msg-header">
+            <div class="msg-avatar ${role === 'user' ? 'user-av' : 'agent-av'}">${role === 'user' ? 'U' : 'A'}</div>
+            <span class="msg-name">${name}</span>
+        </div>
+        <div class="thinking-dots">
+            <span></span><span></span><span></span>
+        </div>
+        <div class="tool-calls"></div>
+        <div class="msg-body"></div>
+    `;
+    messagesDiv.appendChild(div);
+    scrollToBottom();
+    return div;
+}
+
+function hideThinkingDots(div) {
+    const dots = div.querySelector('.thinking-dots');
+    if (dots) dots.style.display = 'none';
+}
+
+function updateStreamingMessage(div, text) {
+    const body = div.querySelector('.msg-body');
+    body.innerHTML = renderMarkdown(text);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function addToolBadge(div, toolName, status) {
+    const container = div.querySelector('.tool-calls');
+    const badge = document.createElement('span');
+    badge.className = `tool-badge ${status}`;
+    badge.id = `tool-${toolName}-${Date.now()}`;
+    badge.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        ${escapeHtml(toolName)}
+    `;
+    container.appendChild(badge);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function updateToolBadge(div, toolName, status) {
+    // Find the last badge of this type
+    const badges = div.querySelectorAll(`.tool-badge`);
+    for (let i = badges.length - 1; i >= 0; i--) {
+        if (badges[i].textContent.includes(toolName)) {
+            badges[i].className = `tool-badge ${status}`;
+            break;
+        }
+    }
 }
 
 /* ── DOM helpers ─────────────────────────────────────────── */
@@ -392,25 +480,9 @@ async function undoLastAction(btn) {
     }
 }
 
-function showThinking() {
-    const div = document.createElement('div');
-    div.className = 'thinking';
-    div.innerHTML = `
-        <div class="msg-header">
-            <div class="msg-avatar agent-av">A</div>
-            <span class="msg-name agent-name">MaazX</span>
-        </div>
-        <div class="thinking-dots">
-            <span></span><span></span><span></span>
-        </div>
-    `;
-    messagesDiv.appendChild(div);
-    scrollToBottom();
-    return div;
-}
 
-function removeThinking(el) {
-    if (el && el.parentNode) el.parentNode.removeChild(el);
+function scrollToBottom() {
+    chatArea.scrollTop = chatArea.scrollHeight;
 }
 
 function scrollToBottom() {
@@ -1109,29 +1181,68 @@ async function loadJobs() {
     try {
         const res = await fetch('/api/jobs');
         const data = await res.json();
-        const jobs = data.jobs || [];
-
-        if (jobs.length === 0) {
-            container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px;">No scheduled tasks currently active. Ask the AI to schedule one!</div>';
-            return;
-        }
+        const activeJobs = data.jobs || [];
+        const historyJobs = data.history || [];
 
         container.innerHTML = '';
-        jobs.forEach(job => {
-            const el = document.createElement('div');
-            el.style.cssText = 'background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:15px; display:flex; justify-content:space-between; align-items:center;';
-            el.innerHTML = `
-                <div>
-                    <h4 style="margin:0 0 5px 0; color:var(--text-primary);">${job.name || 'Task'}</h4>
-                    <div style="font-size:13px; color:var(--text-secondary);">
-                        <span style="color:var(--accent);">Next Run:</span> ${job.next_run_time}<br>
-                        <span style="color:var(--green);">Action:</span> ${job.prompt || 'No specific prompt found'}
+
+        // Active Section
+        const activeHeader = document.createElement('h3');
+        activeHeader.style.cssText = 'color:var(--text-primary); margin: 20px 0 10px 0; font-size: 16px; display: flex; align-items:center; gap: 8px;';
+        activeHeader.innerHTML = `<span style="width:10px; height:10px; background:var(--green); border-radius:50%;"></span> Active Tasks`;
+        container.appendChild(activeHeader);
+
+        if (activeJobs.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'color:var(--text-secondary); text-align:center; padding: 15px; background:var(--bg-tertiary); border-radius:8px; border:1px dashed var(--border);';
+            empty.textContent = 'No active scheduled tasks.';
+            container.appendChild(empty);
+        } else {
+            activeJobs.forEach(job => {
+                const el = document.createElement('div');
+                el.className = 'job-card';
+                el.style.cssText = 'background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:15px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;';
+                el.innerHTML = `
+                    <div>
+                        <h4 style="margin:0 0 5px 0; color:var(--text-primary);">${escapeHtml(job.name) || 'Task'}</h4>
+                        <div style="font-size:12px; color:var(--text-secondary);">
+                            <span style="color:var(--accent);">Next Run:</span> ${job.next_run_time}<br>
+                            <span style="color:var(--blue);">Action:</span> ${escapeHtml(job.prompt)}
+                        </div>
                     </div>
-                </div>
-                <button class="quick-btn" style="border-color:red; color:red;" onclick="deleteJob('${job.id}')">Remove</button>
-            `;
-            container.appendChild(el);
-        });
+                    <button class="quick-btn" style="border-color:rgba(248,81,73,0.3); color:#f85149; padding: 6px 12px; font-size: 12px;" onclick="deleteJob('${job.id}')">Remove</button>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // History Section
+        const historyHeader = document.createElement('h3');
+        historyHeader.style.cssText = 'color:var(--text-secondary); margin: 30px 0 10px 0; font-size: 16px; display: flex; align-items:center; gap: 8px;';
+        historyHeader.innerHTML = `<span style="width:10px; height:10px; background:var(--text-muted); border-radius:50%;"></span> Recently Executed`;
+        container.appendChild(historyHeader);
+
+        if (historyJobs.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'color:var(--text-muted); text-align:center; padding: 15px; font-size: 13px;';
+            empty.textContent = 'No history available.';
+            container.appendChild(empty);
+        } else {
+            historyJobs.forEach(job => {
+                const el = document.createElement('div');
+                el.style.cssText = 'background:rgba(0,0,0,0.1); border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; opacity: 0.8;';
+                const statusColor = job.status === 'completed' ? 'var(--green)' : 'var(--red)';
+                el.innerHTML = `
+                    <div style="flex:1;">
+                        <h4 style="margin:0 0 3px 0; color:var(--text-secondary); font-size: 13px;">${escapeHtml(job.name)}</h4>
+                        <div style="font-size:11px; color:var(--text-muted);">
+                            <span style="color:${statusColor}; font-weight: 600;">[${job.status.toUpperCase()}]</span> @ ${job.executed_at}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
 
     } catch (err) {
         container.innerHTML = `<div style="color:red; text-align:center; padding: 20px;">Failed to load jobs: ${err.message}</div>`;
