@@ -115,7 +115,7 @@ def handle_incoming_message(msg_data: dict):
         
         POWERS & TOOLS:
         - To message someone else: use 'send_whatsapp(contact_name_or_phone, message)'.
-        - To manage contacts: use 'save_whatsapp_contact' or 'delete_whatsapp_contact'.
+        - To manage contacts: use 'save_whatsapp_contact', 'delete_whatsapp_contact', 'wa_block_contact', or 'wa_unblock_contact'.
         - To browse files: use 'list_directory' or 'search_files'.
         - To edit code: use 'edit_file' or 'patch_file'.
         - To execute: use 'run_command'.

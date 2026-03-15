@@ -319,7 +319,7 @@ function appendMessage(role, text, toolCalls = []) {
     const avatarClass = isUser ? 'user-av' : 'agent-av';
     const nameClass = isUser ? 'user-name' : 'agent-name';
     const avatarText = isUser ? 'U' : 'A';
-    const nameText = isUser ? 'You' : 'Agent';
+    const nameText = isUser ? 'You' : 'MaazX';
 
     let toolBadgesHtml = '';
     let hasEditingTool = false;
@@ -398,7 +398,7 @@ function showThinking() {
     div.innerHTML = `
         <div class="msg-header">
             <div class="msg-avatar agent-av">A</div>
-            <span class="msg-name agent-name">Agent</span>
+            <span class="msg-name agent-name">MaazX</span>
         </div>
         <div class="thinking-dots">
             <span></span><span></span><span></span>
