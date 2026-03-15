@@ -12,7 +12,7 @@ import json
 import threading
 import re
 import requests
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 import google.generativeai as genai
 from google.generativeai.types import content_types
 
@@ -67,119 +67,53 @@ def api_chat():
     if not user_msg:
         return jsonify({"error": "Empty message"}), 400
 
-    # Dynamic CWD from DB
     settings = db.load_settings()
     current_working_dir = settings.get("cwd", os.getcwd())
 
-    # ── Intent Classifier ───────────────────────────────────
     from core.intent_classifier import classify_intent
     intent = classify_intent(user_msg)
     
-    print(f"\n[INTENT CLASSIFIER] Message: '{user_msg}' => Intent: {intent}")
+    context_msg = user_msg # Simple for now
     
-    context_msg = f"[CLASSIFIED INTENT: {intent}]\n[WORKING DIRECTORY]: {current_working_dir}\n\n"
-    
-    # Inject Agent Memories
-    memories = db.get_memories()
-    if memories:
-        context_msg += "[USER MEMORIES & BACKGROUND]\n"
-        context_msg += "You MUST adhere to the following facts, preferences, and context established by the user in previous conversations:\n"
-        for k, v in memories.items():
-            context_msg += f"- {k}: {v}\n"
-        context_msg += "\n"
-
-    context_msg += user_msg
-
-    # Save user message to DB
     db.save_chat_message(current_session_id, "user", user_msg)
 
     current_model = app_settings.get("model_name", config.MODEL_NAME)
 
-    # ── OpenRouter path (Gemma 3:27B etc.) ──────────────────
-    if _is_openrouter_model(current_model):
-        api_key = app_settings.get("openrouter_api_key", "")
-        if not api_key:
-            return jsonify({"error": "OpenRouter API key not set. Go to Settings to add it."}), 400
-
-        session_messages.append({"role": "user", "content": context_msg})
-
-        try:
-            # Add system message if first message
-            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages
-            
-            # Disable tools if intent is pure conversational
-            if intent == "chat":
-                tool_defs = []
-            else:
-                tool_defs = openrouter_client.build_tool_definitions()
-
-            result = openrouter_client.chat_completion(api_key, current_model, msgs, tool_defs)
-
-            reply_text = result["reply"]
-            tool_calls = result["tool_calls"]
-
-            # If the model wants to call tools, execute them
-            executed_tools = []
-            for tc in tool_calls:
-                tool_fn = get_tool_by_name(tc["name"])
-                if tool_fn:
-                    try:
-                        tool_result = tool_fn(**tc["args"])
-                        executed_tools.append({"name": tc["name"], "args": tc["args"]})
-                        reply_text += f"\n\n**Tool: {tc['name']}**\n```\n{tool_result}\n```"
-                    except Exception as e:
-                        reply_text += f"\n\nTool {tc['name']} error: {e}"
-
-            session_messages.append({"role": "assistant", "content": reply_text})
-            db.save_chat_message(current_session_id, "assistant", reply_text, executed_tools)
-
-            return jsonify({
-                "reply": reply_text or "Done.",
-                "tool_calls": executed_tools,
-            })
-
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    # ── DeepSeek path ───────────────────────────────────────
-    else:
-        allow_tools = (intent != "chat")
-        
-        session_messages.append({"role": "user", "content": context_msg})
+    # ── SSE Streaming Generator ──────────────────────────────
+    def generate():
+        nonlocal user_msg
+        full_reply_text = ""
+        all_executed_tools = []
         
         try:
-            msgs = [{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages
-            
-            result = deepseek_client.chat_completion_with_tools(
-                messages=msgs,
+            # For now, only DeepSeek path supports streaming tools in this update
+            # We use the new stream function from deepseek_client
+            stream_gen = deepseek_client.chat_completion_with_tools_stream(
+                messages=[{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages + [{"role": "user", "content": context_msg}],
                 model_name=current_model,
-                allow_tools=allow_tools,
-                context_params={
-                    "user_id": "global",
-                    "is_admin": True
-                }
+                allow_tools=(intent != "chat")
             )
-            
-            reply_text = result["reply"]
-            executed_tools = result["executed_tools"]
-            
-            # The chat_completion_with_tools mutates the msgs array by appending tool roles
-            # We must sync those appends back to our session_messages (minus the system prompt)
-            session_messages.clear()
-            session_messages.extend(msgs[1:])
-            
-            db.save_chat_message(current_session_id, "assistant", reply_text, executed_tools)
 
-            return jsonify({
-                "reply": reply_text,
-                "tool_calls": executed_tools,
-            })
+            for chunk in stream_gen:
+                if chunk["t"] == "text":
+                    full_reply_text += chunk["c"]
+                elif chunk["t"] == "tool":
+                    all_executed_tools.append({"name": chunk["n"], "args": chunk["a"]})
+                
+                # yield SSE format
+                yield f"data: {json.dumps(chunk)}\n\n"
+
+            # Finalize session history
+            session_messages.append({"role": "user", "content": context_msg})
+            session_messages.append({"role": "assistant", "content": full_reply_text})
+            db.save_chat_message(current_session_id, "assistant", full_reply_text, all_executed_tools)
 
         except Exception as e:
-            # Pop the user message so they can retry
-            if session_messages and session_messages[-1]["role"] == "user":
-                session_messages.pop()
-            return jsonify({"error": str(e)}), 500
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+# ── Files & Folders ──────────────────────────────────────────
 
 
 @app.route("/api/reset", methods=["POST"])

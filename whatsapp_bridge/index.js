@@ -180,6 +180,46 @@ app.post('/send_media', async (req, res) => {
     }
 });
 
+// REST endpoint to block a contact
+app.post('/block', async (req, res) => {
+    const { contactId } = req.body;
+    if (!contactId) return res.status(400).json({ error: 'Missing "contactId"' });
+
+    try {
+        let chatId = contactId;
+        if (!chatId.includes('@c.us') && !chatId.includes('@g.us')) {
+            chatId = `${chatId.replace(/[^0-9]/g, '')}@c.us`;
+        }
+        const contact = await client.getContactById(chatId);
+        await contact.block();
+        res.json({ success: true, message: `Contact ${chatId} blocked.` });
+        console.log(`[Blocked] ${chatId}`);
+    } catch (err) {
+        console.error('Error blocking contact:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// REST endpoint to unblock a contact
+app.post('/unblock', async (req, res) => {
+    const { contactId } = req.body;
+    if (!contactId) return res.status(400).json({ error: 'Missing "contactId"' });
+
+    try {
+        let chatId = contactId;
+        if (!chatId.includes('@c.us') && !chatId.includes('@g.us')) {
+            chatId = `${chatId.replace(/[^0-9]/g, '')}@c.us`;
+        }
+        const contact = await client.getContactById(chatId);
+        await contact.unblock();
+        res.json({ success: true, message: `Contact ${chatId} unblocked.` });
+        console.log(`[Unblocked] ${chatId}`);
+    } catch (err) {
+        console.error('Error unblocking contact:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/logout', async (req, res) => {
     try {
         await client.logout();

@@ -380,6 +380,7 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
 
 
 
+
 def _call_ollama_llm(messages: List[Dict[str, Any]], model: str, tools: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Calls local Ollama API with chat completion.
@@ -405,6 +406,143 @@ def _call_ollama_llm(messages: List[Dict[str, Any]], model: str, tools: List[Dic
     except Exception as e:
         print(f"[Ollama Error] {e}")
         return {"role": "assistant", "content": f"Ollama Error: {str(e)}"}
+
+def chat_completion_with_tools_stream(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None, context_params: Dict[str, Any] = None):
+    """
+    Yields real-time updates for chat completions with tools.
+    """
+    import database
+    settings = database.load_settings()
+    
+    provider = settings.get("llm_provider", "deepseek")
+    local_model = settings.get("llm_local_model", "qwen2.5-coder:7b")
+    
+    if not context_params:
+        context_params = {}
+
+    schema_tools = build_tool_definitions(whitelist=permitted_tools) if allow_tools else []
+    executed_tools_log = []
+
+    for _ in range(20):
+        if provider == "ollama":
+            # Ollama Streaming
+            url = "http://localhost:11434/api/chat"
+            payload = {
+                "model": local_model,
+                "messages": messages,
+                "stream": True,
+                "options": {"temperature": 0.0}
+            }
+            if schema_tools:
+                payload["tools"] = schema_tools
+
+            full_content = ""
+            tool_calls = []
+
+            with requests.post(url, json=payload, stream=True, timeout=300) as resp:
+                for line in resp.iter_lines():
+                    if not line: continue
+                    chunk = json.loads(line)
+                    msg_chunk = chunk.get("message", {})
+                    
+                    content = msg_chunk.get("content", "")
+                    if content:
+                        full_content += content
+                        yield {"t": "text", "c": content}
+                    
+                    if msg_chunk.get("tool_calls"):
+                        tool_calls.extend(msg_chunk["tool_calls"])
+
+                    if chunk.get("done"):
+                        break
+            
+            message = {"role": "assistant", "content": full_content}
+            if tool_calls:
+                message["tool_calls"] = tool_calls
+
+        else:
+            # DeepSeek Streaming
+            api_key = settings.get("deepseek_api_key") or config.DEEPSEEK_API_KEY
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"model": model_name, "messages": messages, "temperature": 0.0, "stream": True}
+            if schema_tools:
+                payload["tools"] = schema_tools
+
+            full_content = ""
+            tool_calls_raw = {} # To aggregate streaming tool call parts
+
+            with requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, stream=True, timeout=120) as resp:
+                for line in resp.iter_lines():
+                    if not line: continue
+                    line_str = line.decode('utf-8')
+                    if line_str.startswith("data: "):
+                        if line_str == "data: [DONE]": break
+                        chunk = json.loads(line_str[6:])
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        
+                        content = delta.get("content", "")
+                        if content:
+                            full_content += content
+                            yield {"t": "text", "c": content}
+                        
+                        if delta.get("tool_calls"):
+                            for tc in delta["tool_calls"]:
+                                idx = tc.get("index", 0)
+                                if idx not in tool_calls_raw:
+                                    tool_calls_raw[idx] = {"id": tc.get("id"), "type": "function", "function": {"name": "", "arguments": ""}}
+                                
+                                if tc["function"].get("name"):
+                                    tool_calls_raw[idx]["function"]["name"] += tc["function"]["name"]
+                                if tc["function"].get("arguments"):
+                                    tool_calls_raw[idx]["function"]["arguments"] += tc["function"]["arguments"]
+
+            message = {"role": "assistant", "content": full_content}
+            if tool_calls_raw:
+                message["tool_calls"] = [v for k, v in sorted(tool_calls_raw.items())]
+
+        # Process Message (Text or Tools)
+        if not message.get("tool_calls"):
+            messages.append(message)
+            return
+
+        # Model wants to use tools
+        messages.append(message)
+        for tc in message.get("tool_calls", []):
+            fn = tc.get("function", {})
+            fn_name = fn.get("name", "")
+            call_id = tc.get("id", "")
+            
+            try:
+                fn_args = tc.get("function", {}).get("arguments", "{}")
+                if isinstance(fn_args, str):
+                    fn_args = json.loads(fn_args)
+            except Exception:
+                fn_args = {}
+            
+            yield {"t": "tool", "n": fn_name, "a": fn_args}
+            executed_tools_log.append({"name": fn_name, "args": fn_args})
+            
+            # Execute locally
+            tool_func = get_tool_by_name(fn_name)
+            if tool_func:
+                try:
+                    import inspect
+                    sig = inspect.signature(tool_func)
+                    final_args = fn_args.copy()
+                    if context_params:
+                        if "user_id" in sig.parameters and "user_id" not in final_args:
+                            final_args["user_id"] = context_params.get("user_id", "global")
+                        if "is_admin" in sig.parameters and "is_admin" not in final_args:
+                            final_args["is_admin"] = context_params.get("is_admin", False)
+                    result = tool_func(**final_args)
+                    result_str = str(result)
+                except Exception as e:
+                    result_str = f"Error executing {fn_name}: {str(e)}"
+            else:
+                result_str = f"Error: Tool '{fn_name}' not found."
+            
+            yield {"t": "result", "n": fn_name, "r": result_str}
+            messages.append({"role": "tool", "tool_call_id": call_id, "name": fn_name, "content": result_str})
 
 def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None, context_params: Dict[str, Any] = None) -> Dict[str, Any]:
     """
