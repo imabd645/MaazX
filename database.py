@@ -90,7 +90,9 @@ DEFAULT_SETTINGS = {
     "wa_owner_name": "User",
     "google_vision_key_path": "",
     "vision_provider": "ollama",
-    "vision_model": "moondream"
+    "vision_model": "moondream",
+    "llm_provider": "deepseek",
+    "llm_local_model": "qwen3:8b"
 }
 
 
