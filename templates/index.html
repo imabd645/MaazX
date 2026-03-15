@@ -314,6 +314,22 @@
                                 </div>
 
                                 <div class="setting-group">
+                                    <label class="setting-label">Main LLM Provider</label>
+                                    <select class="setting-input" id="setting-llm-provider">
+                                        <option value="deepseek">DeepSeek (Cloud - Smartest)</option>
+                                        <option value="ollama">Ollama (Local - Private & Free)</option>
+                                    </select>
+                                    <span class="setting-hint">The "Primary Brain" of your agent</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">Local LLM Model</label>
+                                    <input type="text" class="setting-input" id="setting-llm-local-model"
+                                        placeholder="qwen3:8b">
+                                    <span class="setting-hint">Ollama model name (e.g., qwen3:8b, llama3.1)</span>
+                                </div>
+
+                                <div class="setting-group">
                                     <label class="setting-label">DeepSeek API Key</label>
                                     <input type="password" class="setting-input" id="setting-deepseek-key"
                                         placeholder="sk-...">
