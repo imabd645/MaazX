@@ -82,3 +82,35 @@ def trim_whatsapp_history(count: int, phone_number: str = None):
         return f"Successfully deleted the last {count} messages for {phone_number}."
     except Exception as e:
         return f"Error trimming history: {e}"
+
+@register_tool
+def wa_block_contact(phone_number: str):
+    """
+    Blocks a contact on WhatsApp. This prevents them from messaging the bot.
+    
+    Args:
+        phone_number (str): The WhatsApp ID to block (e.g., '923350806140@c.us').
+    """
+    try:
+        import requests
+        res = requests.post("http://127.0.0.1:3000/block", json={"contactId": phone_number}, timeout=15)
+        res.raise_for_status()
+        return f"Successfully blocked contact {phone_number} on WhatsApp."
+    except Exception as e:
+        return f"Error blocking contact: {e}"
+
+@register_tool
+def wa_unblock_contact(phone_number: str):
+    """
+    Unblocks a contact on WhatsApp.
+    
+    Args:
+        phone_number (str): The WhatsApp ID to unblock (e.g., '923350806140@c.us').
+    """
+    try:
+        import requests
+        res = requests.post("http://127.0.0.1:3000/unblock", json={"contactId": phone_number}, timeout=15)
+        res.raise_for_status()
+        return f"Successfully unblocked contact {phone_number} on WhatsApp."
+    except Exception as e:
+        return f"Error unblocking contact: {e}"
