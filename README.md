@@ -1,100 +1,131 @@
-# 🤖 MaazX AI Agent v3.2 — Ultra-Detailed Technical Specification
+# 🦁 MaazX Autonomous AI Agent — v3.5
 
-> **The Definitive System Documentation**  
-> An autonomous, multi-channel engineering agent powered by DeepSeek-V3, Gemini 2.x, and a specialized tool-calling framework.
+![MaazX Banner](static/img/banner.png) <!-- Note: Add a banner image if you have one, or remove this line -->
 
----
-
-## 🏛 1. High-Level Architecture
-
-The system is built on an **Event-Driven Agentic Core** that bridges standard web protocols (REST) with asynchronous communication channels (WhatsApp/Cron).
-
-### 🔄 Message Logic Flow
-1. **Reception**: A message arrives via the Web UI (HTTP POST) or WhatsApp Bridge (Node.js webhook).
-2. **Context Assembly**: The system retrieves the last 20-40 messages from `agent_data.db` and injects the current `CWD` and `System Instructions`.
-3. **Reasoning**: The DeepSeek-V3 model analyzes the intent. If an action is required, it emits a `tool_call`.
-4. **Execution**: The `local_orchestrator` executes the Python function.
-5. **Synthesis**: The tool result is fed back to the model for a final conversational response.
-6. **Plain-Text Filter**: Outgoing messages pass through `strip_markdown()` to ensure compatibility.
+**MaazX** is a high-performance, fully autonomous AI engineering agent designed to bridge the gap between Large Language Models and local system environments. Built on a multi-modal foundation, MaazX can read code, manage files, search the web, control system resources, and interact with real-world communication channels (WhatsApp, Gmail) autonomously.
 
 ---
 
-## 📡 2. API Reference (Internal REST)
+## 🏗 Architecture Overview
 
-The `web_app.py` server exposes the following endpoints for the frontend and external integrations:
+MaazX operates on a **Reactive Tool-Calling Loop**. Unlike static chatbots, MaazX maintains a persistent state and a live connection to a suite of system-level tools.
 
-### Core Chat
-- `POST /api/chat`: Primary interaction endpoint. Processes user messages and returns AI responses + tool logs.
-- `POST /api/reset`: Resets the current in-memory session.
+```mermaid
+graph TD
+    User((User)) -->|Web UI / CLI| WebServer[Flask Web Server]
+    WebServer -->|SSE Stream| AgentEngine[MaazX Agent Engine]
+    AgentEngine -->|Intent Analysis| Classifier[Intent Classifier]
+    
+    subgraph "Decision Center"
+        AgentEngine -->|System Clock Refresh| LLM[DeepSeek / Gemini LLM]
+        LLM -->|Tool Request| Dispatcher[Tool Dispatcher]
+    end
+    
+    subgraph "External Integrations"
+        Dispatcher -->|WhatsApp ID| WABridge[WhatsApp Bridge - Node.js]
+        Dispatcher -->|Gmail API| GoogleAPI[Google Cloud API]
+        Dispatcher -->|Cron Schedule| Scheduler[APScheduler - SQLite]
+    end
+    
+    subgraph "Local Environment"
+        Dispatcher -->|File Ops| FS[File System]
+        Dispatcher -->|Commands| Shell[Windows PowerShell]
+        Dispatcher -->|Knowledge| RAG[ChromaDB Vector Store]
+    end
+```
 
-### File & Project Management
-- `GET /api/get_cwd`: Returns the current active working directory.
-- `POST /api/set_cwd`: Changes the agent's target directory.
-- `GET /api/browse`: Returns a list of files/folders for the directory browser.
-- `GET /api/project_files`: Returns a recursive tree structure of the current codebase.
-- `POST /api/file_content`: Retrieves terminal-safe text content of a specific file.
-- `POST /api/save_file`: Writes edited text back to the file system.
-
-### RAG & Knowledge Base
-- `POST /api/index_codebase`: Triggers recursive semantic indexing of the project.
-- `GET /api/indexing_status`: Returns the percentage completion of the vector index.
-- `POST /api/upload_knowledge`: Adds a PDF/Docx to the long-term knowledge base.
-- `GET /api/list_knowledge`: Lists all indexed external documents.
-- `POST /api/delete_knowledge`: Removes a document from the vector store.
-
-### System & Integration
-- `GET /api/get_health`: Returns connectivity status (Online/Offline) for Gemini, DeepSeek, and WA Bridge.
-- `POST /api/restart_bridge`: Triggers a restart of the Node.js WhatsApp subprocess.
-- `GET /api/gmail/auth`: Starts the OAuth2 flow.
-- `GET /api/gmail/status`: Returns current Gmail connection state.
-
----
-
-## 🗄 3. Database Schema (`agent_data.db`)
-
-The system uses SQLite for persistent state and low-latency history retrieval.
-
-| Table | Primary Columns | Purpose |
-|-------|-----------------|---------|
-| `settings` | `key`, `value` | Persists API keys, CWD, and Model preferences. |
-| `chat_history` | `session`, `role`, `content`, `tool_calls` | Stores Web-based conversation logs. |
-| `terminal_history` | `command`, `output`, `exit_code`, `cwd` | Logs every shell command executed by the agent. |
-| `whatsapp_contacts`| `phone_number`, `name`, `rules` | Custom personality rules for specific WhatsApp users. |
-| `whatsapp_messages`| `phone_number`, `role`, `content` | Persistent bridge history for asynchronous chats. |
-| `memories` | `key`, `value` | Long-term "facts" the agent learns about the user. |
+### Key Components:
+- **Core Engine**: Orchestrates the multi-turn conversation and tool execution logic.
+- **Dynamic System Clock**: Injects real-time system timestamps into every prompt to ensure 100% scheduling accuracy.
+- **Autonomous Scheduler**: A background service that persists and executes tasks (e.g., cron jobs) even when the main UI is closed.
+- **WhatsApp Bridge**: A Node.js middleware utilizing `whatsapp-web.js` for seamless instant messaging.
+- **RAG Knowledge Base**: A vector-indexed store for processing uploaded documents (PDFs, Docs, etc.).
 
 ---
 
-## 🛠 4. Advanced Technical Configuration
+## 💎 Core Capabilities
 
-### Customizing the System Instruction
-Edit the `SYSTEM_INSTRUCTION` block in `config.py` to change the agent's behavior. The rules follow a **Strict Operational Charter** where acting (`tool_call`) is prioritized over narrating.
+### 📂 File System & Engineering
+- **Atomic Edits**: Targeted line-level replacements via `patch_file` and `edit_file`.
+- **Codebase Mapping**: Recursive directory scanning and semantic search.
+- **Git Integration**: Full version control management (commit, branch, push).
 
-### OAuth2 / PKCE Implementation
-The Gmail integration avoids static passwords using the **PKCE (Proof Key for Code Exchange)** flow. 
-- The `code_verifier` is generated at runtime and stored in the `settings` table.
-- Tokens are exchanged and encrypted in the local database.
-- `google-auth-oauthlib` manages the secure handshake.
+### 📱 Real-World Sync
+- **WhatsApp Bridge**: Send messages, search contacts, and manage block lists.
+- **Gmail Automation**: Send emails, read threads, and manage labels.
+- **Web Browser**: Full automation for scraping, clicking, and interacting with web apps.
 
----
+### 🕒 Autonomous Scheduling (V3.5 Exclusive)
+- **Active Tasks**: Schedule one-time or recurring tasks using natural language.
+- **Execution History**: Persistent logging of all finished tasks, including success/failure status and response data.
+- **Year-Lock (2026)**: Hardcoded time-awareness to prevent past-date scheduling errors.
 
-## ❗ 5. Troubleshooting & Maintenance
-
-| Issue | Resolution |
-|-------|------------|
-| **403 Access Blocked** | Your Google Cloud Project must be in "Testing" mode with your email added as a "Test User". |
-| **Missing code verifier** | Ensure `web_app.py` is running on `localhost:5000` so the session persistence in SQLite works during the redirect. |
-| **Empty Tool List** | Verify `tools/__init__.py` contains `import tools.filename` for every new tool created. |
-| **WA Bridge Offline** | Ensure `whatsapp_bridge/index.js` is running via Node.js and that you've scanned the QR code. |
-
----
-
-## 👨‍💻 6. Security Framework
-
-- **Isolation**: The WhatsApp Bridge runs in a separate Node.js process to prevent crash propagation.
-- **Filtering**: `core/utils.py:strip_markdown` prevents injection of formatting artifacts into plain-text channels.
-- **Validation**: The `read_file` tool is a mandatory precursor to `edit_file` to prevent blind overwriting of critical system logic.
+### 💻 System Intelligence
+- **PC Control**: Execute shell commands, monitor system health, and capture webcam snapshots.
+- **Vision Intelligence**: Analyze screenshots and UI layouts for debugging.
+- **Memory store**: Persistent fact-storage across chat sessions.
 
 ---
 
-*Documentation Version 3.2 — Updated March 2026*
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- **Python 3.10+** (System architecture requires `pip` for dependencies).
+- **Node.js 18+** (Required only for the WhatsApp Bridge).
+- **DeepSeek/Gemini API Key**.
+
+### 2. Installation
+
+1. **Clone & Install Python Dependencies**:
+   ```powershell
+   git clone <repository-url>
+   cd "AI Agnet"
+   pip install -r requirements.txt --break-system-packages
+   ```
+
+2. **Configure Secrets**:
+   Create a file named `agent_secrets.env` in the root directory:
+   ```env
+   ANTIGRAVITY_GEMINI_API_KEY=your_gemini_key
+   ANTIGRAVITY_DEEPSEEK_API_KEY=your_deepseek_key
+   ```
+
+3. **Initialize WhatsApp Bridge (Optional)**:
+   ```powershell
+   cd whatsapp_bridge
+   npm install
+   node bridge.js
+   ```
+
+### 3. Running the Agent
+Start the Flask Web Server:
+```powershell
+python web_app.py
+```
+Open your browser to `http://localhost:5000`.
+
+---
+
+## 🎨 Professional Web UI
+The MaazX interface is designed for speed and transparency:
+- **Streaming Response**: Real-time text generation with live thinking indicators.
+- **Tool Traces**: Watch every bash command and tool call as it happens.
+- **Scheduled Tasks View**: A dedicated dashboard to monitor and cancel upcoming background jobs.
+- **Health Monitor**: Real-time status of API connections and system resources.
+
+---
+
+## 🛠 Extending MaazX
+Adding a new capability is simple:
+1. Create a new Python file in `/tools/`.
+2. Define your function and its arguments.
+3. Register the tool in `core/tool_registry.py`.
+4. The agent will automatically interpret its purpose and start using it appropriately.
+
+---
+
+## 📜 License
+MaazX is licensed under the MIT License. Built with ❤️ for autonomous engineering.
+
+---
+*Created by the MaazX Team — Empowering your local workspace with AI Agency.*
