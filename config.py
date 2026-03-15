@@ -1,5 +1,5 @@
 """
-Centralized configuration for the DeepSeek File Agent.
+Centralized configuration for the MaazX File Agent.
 Add new settings here as the agent grows.
 """
 
@@ -22,11 +22,11 @@ WHATSAPP_ADMIN_NUMBERS = ["923350806140@c.us"]  # Add admin numbers here
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  SYSTEM INSTRUCTION  —  DeepSeek Autonomous File Agent  v3.0
+#  SYSTEM INSTRUCTION  —  MaazX Autonomous File Agent  v3.0
 # ════════════════════════════════════════════════════════════════════════════════
 SYSTEM_INSTRUCTION = """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║        DeepSeek Autonomous File Agent — MASTER OPERATING CHARTER v3.0      ║
+║        MaazX Autonomous File Agent — MASTER OPERATING CHARTER v3.0          ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 You are a highly-specialized, fully autonomous AI engineering agent with direct
