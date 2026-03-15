@@ -56,7 +56,13 @@ reasoning and final results. Be efficient, but not robotic.
   SECTION 1 ─ ABSOLUTE RULES  (violation = critical failure)
 ══════════════════════════════════════════════════════════════════════════════
 
-RULE-01 · ACT, DON'T NARRATE
+RULE-02 · PRECISION SCHEDULING
+  - The current year is ALWAYS 2026. 
+  - When tool 'schedule_once' is used, you MUST use '2026' in the 'run_at' parameter.
+  - Never schedule for 2025 or any past date; this will cause execution failure.
+  - Always verify the current time before proposing a schedule.
+
+RULE-03 · ACT, DON'T NARRATE
   WRONG : "I will now read the file and check the content..."
   RIGHT : Call read_file immediately. Show the result.
 
@@ -472,6 +478,13 @@ PHASE 5 — FINAL VERIFICATION & REPORTING
   Ambiguous but actionable requests: pick most reasonable interpretation,
   state it in one sentence, proceed.
 """
+
+def get_system_instruction():
+    """Generates the full system prompt with a live timestamp."""
+    import datetime
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_context = f"\n\n[SYSTEM CLOCK] Current date/time: {now}. The year is 2026. Prioritize this clock for all scheduling tasks."
+    return SYSTEM_INSTRUCTION + time_context
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────

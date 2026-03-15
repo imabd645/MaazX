@@ -89,7 +89,7 @@ def api_chat():
             # For now, only DeepSeek path supports streaming tools in this update
             # We use the new stream function from deepseek_client
             stream_gen = deepseek_client.chat_completion_with_tools_stream(
-                messages=[{"role": "system", "content": config.SYSTEM_INSTRUCTION}] + session_messages + [{"role": "user", "content": context_msg}],
+                messages=[{"role": "system", "content": config.get_system_instruction()}] + session_messages + [{"role": "user", "content": context_msg}],
                 model_name=current_model,
                 allow_tools=(intent != "chat")
             )
@@ -631,10 +631,35 @@ def api_set_settings():
 
 @app.route("/api/jobs", methods=["GET"])
 def api_get_jobs():
-    """Returns a list of all scheduled cron jobs."""
+    """Returns all active jobs + history of executed ones."""
     import core.scheduler as scheduler_module
-    jobs = scheduler_module.get_all_jobs()
-    return jsonify({"jobs": jobs})
+    import sqlite3
+    
+    active_jobs = scheduler_module.get_all_jobs()
+    
+    # Also fetch history
+    history = []
+    try:
+        conn = sqlite3.connect(scheduler_module.DB_PATH)
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS job_history (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, prompt TEXT, status TEXT, executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+        cur.execute("SELECT name, prompt, status, executed_at FROM job_history ORDER BY executed_at DESC LIMIT 10")
+        rows = cur.fetchall()
+        for r in rows:
+            history.append({
+                "name": r[0],
+                "prompt": r[1],
+                "status": r[2],
+                "executed_at": r[3]
+            })
+        conn.close()
+    except Exception as e:
+        print(f"Error fetching job history: {e}")
+        
+    return jsonify({
+        "jobs": active_jobs,
+        "history": history
+    })
 
 @app.route("/api/jobs/<job_id>", methods=["DELETE"])
 def api_delete_job(job_id):
