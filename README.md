@@ -1,131 +1,141 @@
-# 🦁 MaazX Autonomous AI Agent — v3.5
+# 🦁 MaazX Autonomous AI Agent — v3.8 (Enterprise Manual)
 
-![MaazX Banner](static/img/banner.png) <!-- Note: Add a banner image if you have one, or remove this line -->
 
-**MaazX** is a high-performance, fully autonomous AI engineering agent designed to bridge the gap between Large Language Models and local system environments. Built on a multi-modal foundation, MaazX can read code, manage files, search the web, control system resources, and interact with real-world communication channels (WhatsApp, Gmail) autonomously.
+
+**MaazX** is a production-grade, fully autonomous AI engineering agent. It resides directly on your hardware, bridging the intelligence of frontier Large Language Models (DeepSeek, Gemini, Ollama) with the raw power of your local operating system.
+
+Unlike traditional chat interfaces, MaazX is an **active participant** in your development cycle. It doesn't just suggest code; it reads your filesystem, interprets logic patterns, executes PowerShell commands, manages your Git state, and communicates results through encrypted WhatsApp and Gmail channels.
 
 ---
 
-## 🏗 Architecture Overview
+## � Deep Architecture: The Reactive Tool-Calling Loop
 
-MaazX operates on a **Reactive Tool-Calling Loop**. Unlike static chatbots, MaazX maintains a persistent state and a live connection to a suite of system-level tools.
+The core of MaazX is based on a **perpetual observation-action cycle**. Every user request is processed as a "Goal," and the agent iteratively selects the best tools to achieve it.
 
+### 🔄 The Execution Lifecycle
+1.  **Intent Classification**: MaazX uses a lightweight classifier to determine if a request is purely conversational (Chat Mode) or requires system access (Agent Mode).
+2.  **System Clock Injection**: A dynamic "Master Clock" is injected into every prompt. This ensures the agent is aware of the exact current second, year (2026), and local timezone before proposing any sensitive scheduling action.
+3.  **Autonomous Tool Dispatch**: The LLM emits a `tool_call`. MaazX intercepts this call, executes the logic in a secure Python sub-process, and feeds the *raw output* (stdout/stderr) back to the LLM.
+4.  **Refinement Loop**: If a tool fails (e.g., a regex match misses), MaazX analyzes the error, adjusts its parameters, and retries with a broader context—automatically.
+
+### 🗺 System Map
 ```mermaid
 graph TD
-    User((User)) -->|Web UI / CLI| WebServer[Flask Web Server]
-    WebServer -->|SSE Stream| AgentEngine[MaazX Agent Engine]
-    AgentEngine -->|Intent Analysis| Classifier[Intent Classifier]
+    User((User)) -->|Web UI / WhatsApp| Gate[Entry Gate]
+    Gate -->|JSON/SSE| Engine[MaazX Core Engine]
     
-    subgraph "Decision Center"
-        AgentEngine -->|System Clock Refresh| LLM[DeepSeek / Gemini LLM]
-        LLM -->|Tool Request| Dispatcher[Tool Dispatcher]
+    subgraph "Intelligence & Memory"
+        Engine <-->|RAG| Vector[ChromaDB Knowledge Base]
+        Engine <-->|SQL| Persist[SQLite Memory & Settings]
+        Engine -->|Real-time| LLM[Frontier Models]
     end
-    
-    subgraph "External Integrations"
-        Dispatcher -->|WhatsApp ID| WABridge[WhatsApp Bridge - Node.js]
-        Dispatcher -->|Gmail API| GoogleAPI[Google Cloud API]
-        Dispatcher -->|Cron Schedule| Scheduler[APScheduler - SQLite]
+
+    subgraph "The Hand of the Agent"
+        LLM -->|Dispatch| Toolset[Universal Toolset]
+        Toolset -->|Native| FS[File System & Git]
+        Toolset -->|Automation| Browser[Playwright Browser]
+        Toolset -->|System| PowerShell[Windows Shell]
+        Toolset -->|Media| Vision[Webcam & Logic Screen-Cap]
     end
-    
-    subgraph "Local Environment"
-        Dispatcher -->|File Ops| FS[File System]
-        Dispatcher -->|Commands| Shell[Windows PowerShell]
-        Dispatcher -->|Knowledge| RAG[ChromaDB Vector Store]
+
+    subgraph "Communication Layer"
+        Engine <-->|Webhook| WhatsApp[Node.js WhatsApp Bridge]
+        Engine <-->|OAuth2| Gmail[Google Workspace]
     end
 ```
 
-### Key Components:
-- **Core Engine**: Orchestrates the multi-turn conversation and tool execution logic.
-- **Dynamic System Clock**: Injects real-time system timestamps into every prompt to ensure 100% scheduling accuracy.
-- **Autonomous Scheduler**: A background service that persists and executes tasks (e.g., cron jobs) even when the main UI is closed.
-- **WhatsApp Bridge**: A Node.js middleware utilizing `whatsapp-web.js` for seamless instant messaging.
-- **RAG Knowledge Base**: A vector-indexed store for processing uploaded documents (PDFs, Docs, etc.).
+---
+
+## 🛡 Security & Operational Protocols
+
+MaazX adheres to a strict set of **Absolute Engineering Rules** (defined in `config.py`) that prioritize safety and accuracy:
+
+*   **Rule 01: Read Before Write**: The agent is physically blocked from editing any file it has not read in the current session. This prevents "blind overwriting."
+*   **Rule 02: Atomic Patching**: For large files, MaazX uses a patch-and-apply logic rather than full rewrites. This preserves metadata and prevents accidental deletion of unrelated code.
+*   **Rule 03: Precision Scheduling**: The agent enforces a "Year-Lock (2026)" protocol. Any task scheduled for a past date is caught by a pre-execution safety layer and rejected.
+*   **Rule 04: Absolute Paths Only**: To prevent directory traversal errors or confusion across different PowerShell contexts, every tool call must use a fully-qualified absolute path.
 
 ---
 
-## 💎 Core Capabilities
+## � Advanced Capabilities & Integration
 
-### 📂 File System & Engineering
-- **Atomic Edits**: Targeted line-level replacements via `patch_file` and `edit_file`.
-- **Codebase Mapping**: Recursive directory scanning and semantic search.
-- **Git Integration**: Full version control management (commit, branch, push).
+### � Engineering Intelligence
+- **Semantic Code Search**: Using ChromaDB, MaazX can find "The function that handles JWT signatures" even if you don't know the filename.
+- **Autonomous Refactoring**: Give a goal ("Convert this whole module to use async/await"), and MaazX will map dependencies, plan the order of edits, and execute the migration.
+- **Vision Debugging**: MaazX can capture your screen, send it to a Vision-Enabled model, and debug UI layout alignment issues in real-time.
 
-### 📱 Real-World Sync
-- **WhatsApp Bridge**: Send messages, search contacts, and manage block lists.
-- **Gmail Automation**: Send emails, read threads, and manage labels.
-- **Web Browser**: Full automation for scraping, clicking, and interacting with web apps.
+### 🕒 The Autonomous Scheduler (v3.8)
+MaazX features a persistent background daemon that lives in `core/scheduler.py`.
+- **Persistent Jobs**: Scheduled tasks are stored in `agent_data.db`. If you restart your PC, MaazX resumes its schedule automatically.
+- **Execution History**: A transparent log of every "Recently Executed" task is visible in the UI, showing exactly what the agent said and did while you were away.
+- **History Slicing**: Control how much context is kept to prevent token-overflow while maintaining long-term memory.
 
-### 🕒 Autonomous Scheduling (V3.5 Exclusive)
-- **Active Tasks**: Schedule one-time or recurring tasks using natural language.
-- **Execution History**: Persistent logging of all finished tasks, including success/failure status and response data.
-- **Year-Lock (2026)**: Hardcoded time-awareness to prevent past-date scheduling errors.
-
-### 💻 System Intelligence
-- **PC Control**: Execute shell commands, monitor system health, and capture webcam snapshots.
-- **Vision Intelligence**: Analyze screenshots and UI layouts for debugging.
-- **Memory store**: Persistent fact-storage across chat sessions.
+### � Real-World Connectivity
+- **WhatsApp Bridge (Node.js)**: A standalone middleware using `whatsapp-web.js`. It handles QR-code login and bidirectional webhooks.
+- **Gmail Automation**: Full integration with the Gmail API for professional correspondence and automated report distribution.
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ Setup & Configuration
 
-### 1. Prerequisites
-- **Python 3.10+** (System architecture requires `pip` for dependencies).
-- **Node.js 18+** (Required only for the WhatsApp Bridge).
-- **DeepSeek/Gemini API Key**.
+### 1. Minimal Prerequisites
+- **Python 3.10+** (Added to PATH)
+- **Node.js 18+** (For WhatsApp)
+- **Git** (For autonomous version control)
 
-### 2. Installation
-
-1. **Clone & Install Python Dependencies**:
-   ```powershell
-   git clone <repository-url>
-   cd "AI Agnet"
-   pip install -r requirements.txt --break-system-packages
-   ```
-
-2. **Configure Secrets**:
-   Create a file named `agent_secrets.env` in the root directory:
-   ```env
-   ANTIGRAVITY_GEMINI_API_KEY=your_gemini_key
-   ANTIGRAVITY_DEEPSEEK_API_KEY=your_deepseek_key
-   ```
-
-3. **Initialize WhatsApp Bridge (Optional)**:
-   ```powershell
-   cd whatsapp_bridge
-   npm install
-   node bridge.js
-   ```
-
-### 3. Running the Agent
-Start the Flask Web Server:
+### 2. Fast-Path Installation
 ```powershell
+# 1. Clone the core
+git clone <repository-url> "MaazX-Agent"
+cd "MaazX-Agent"
+
+# 2. Build the Python Environment
+pip install -r requirements.txt --break-system-packages
+
+# 3. Setup Secrets
+# Create agent_secrets.env with:
+# ANTIGRAVITY_GEMINI_API_KEY=xxx
+# ANTIGRAVITY_DEEPSEEK_API_KEY=xxx
+```
+
+### 3. Launching the MaazX Hub
+```powershell
+# Start the web interface
 python web_app.py
 ```
-Open your browser to `http://localhost:5000`.
+MaazX will be live at `http://localhost:5000`. 
+
+*Note: For first-time WhatsApp use, the Node bridge will output a QR code in the terminal. Scan it to link your account.*
 
 ---
 
-## 🎨 Professional Web UI
-The MaazX interface is designed for speed and transparency:
-- **Streaming Response**: Real-time text generation with live thinking indicators.
-- **Tool Traces**: Watch every bash command and tool call as it happens.
-- **Scheduled Tasks View**: A dedicated dashboard to monitor and cancel upcoming background jobs.
-- **Health Monitor**: Real-time status of API connections and system resources.
+## 🛠 Developer Guide: Creating Custom Tools
+
+Extending MaazX's power is designed for developers. 
+
+**Structure of a Tool (`/tools/my_new_tool.py`):**
+```python
+def my_capability(param: str) -> str:
+    """
+    Docstrings are CRITICAL. The LLM reads this to understand WHEN to use this tool.
+    Explain the parameters and the expected return value clearly.
+    """
+    try:
+        # Your logic here
+        return "Transformation complete: " + param
+    except Exception as e:
+        return f"Error: {e}"
+```
+
+Once saved, register it in `core/tool_registry.py` and the agent will immediately begin incorporating it into its problem-solving logic.
 
 ---
 
-## 🛠 Extending MaazX
-Adding a new capability is simple:
-1. Create a new Python file in `/tools/`.
-2. Define your function and its arguments.
-3. Register the tool in `core/tool_registry.py`.
-4. The agent will automatically interpret its purpose and start using it appropriately.
+## � Roadmap & Versioning
+- **v3.5**: Rebranding completion and UI Streaming.
+- **v3.8**: **(Current)** Real-time Clock Sync, Persistent Job History, and Master Technical Manual.
+- **v4.0**: (Planned) Multi-Agent Swarm logic and Voice-Activated Commands via Whisper.
 
 ---
-
-## 📜 License
-MaazX is licensed under the MIT License. Built with ❤️ for autonomous engineering.
-
----
-*Created by the MaazX Team — Empowering your local workspace with AI Agency.*
+**MaazX** — *The future of local engineering agency.*
+*Developed by the Abdullah Masood. Powered by Advanced Intelligence.*
