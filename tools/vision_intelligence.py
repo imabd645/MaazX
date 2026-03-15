@@ -43,7 +43,7 @@ def _get_ollama_vision(image_path, query, model="moondream"):
         }
         
         print(f"[Ollama Vision] Sending request to {model}...")
-        response = requests.post("http://localhost:11434/api/generate", json=payload, timeout=60)
+        response = requests.post("http://localhost:11434/api/generate", json=payload, timeout=300)
         
         if response.status_code == 200:
             return response.json().get("response", "No response from local model.")
