@@ -22,10 +22,12 @@ def remember_fact(key: str, value: str, user_id: str = "global") -> str:
 @register_tool
 def forget_fact(key: str, user_id: str = "global") -> str:
     """
-    Deletes a specific memory from the database.
+    Deletes a personal memory or preference from the database.
+    If user_id is 'global', it will try to delete from global memories (requires caution).
 
     Args:
         key: The exact key of the memory to delete.
+        user_id: The ID of the user whose memory to delete. Defaults to "global".
     """
     deleted = db.delete_memory(key, user_id=user_id)
     if deleted:
@@ -48,27 +50,52 @@ def set_global_instruction(key: str, value: str, is_admin: bool = False) -> str:
 
 
 @register_tool
+def forget_global_fact(key: str, is_admin: bool = False) -> str:
+    """
+    [ADMIN ONLY] Permanently deletes a universal fact or instruction.
+    
+    Args:
+        key: The exact key of the global fact to delete.
+        is_admin: Must be True to execute.
+    """
+    if not is_admin:
+        return "ERROR: Only admins can delete global facts."
+    
+    deleted = db.delete_memory(key, user_id="global")
+    if deleted:
+        return f"Successfully deleted global fact '{key}'."
+    else:
+        return f"No global fact found with the key '{key}'."
+
+
+@register_tool
 def list_memories(user_id: str = "global", is_admin: bool = False) -> str:
     """
-    Lists saved user memories. 
-    Admins see global + personal. Users see ONLY personal.
+    Lists saved memories. 
+    Global memories (shared knowledge) are ALWAYS visible. 
+    User-specific memories are isolated per user.
     """
-    # 1. Fetch personal + global
+    # 1. Fetch memories
     all_memories = db.get_memories(user_id=user_id, include_global=True)
     
-    # 2. Filter for visibility logic
-    if not is_admin:
-        # Hide global keys from listing for regular users
-        global_keys = db.get_memories(user_id="global", include_global=False).keys()
-        display_mems = {k: v for k, v in all_memories.items() if k not in global_keys}
-    else:
-        display_mems = all_memories
-
-    if not display_mems:
-        return "You have no saved memories."
+    if not all_memories:
+        return "No memories found."
     
-    output = "Here are your saved memories:\n"
-    for k, v in display_mems.items():
-        prefix = "[GLOBAL] " if is_admin and k in db.get_memories(user_id="global", include_global=False) else ""
-        output += f"- {prefix}{k}: {v}\n"
+    # 2. Categorize for display
+    global_mems = db.get_memories(user_id="global", include_global=False)
+    
+    output = "## 🧠 Stored Memories\n"
+    
+    # Header for clarity
+    if user_id != "global":
+        output += f"Context: Personal ({user_id}) + Shared Knowledge\n\n"
+    else:
+        output += "Context: Shared Knowledge\n\n"
+
+    # Display loop
+    for k, v in all_memories.items():
+        is_global = k in global_mems
+        prefix = "🌍 [SHARED] " if is_global else "👤 [PERSONAL] "
+        output += f"- **{prefix}{k}**: {v}\n"
+    
     return output

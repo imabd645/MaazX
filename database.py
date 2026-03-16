@@ -49,7 +49,8 @@ def init_db():
             phone_number TEXT PRIMARY KEY,
             name         TEXT,
             summary      TEXT DEFAULT '',
-            rules        TEXT DEFAULT ''
+            rules        TEXT DEFAULT '',
+            auto_reply   INTEGER DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS whatsapp_messages (
@@ -86,8 +87,11 @@ DEFAULT_SETTINGS = {
     "openrouter_api_key": "",
     "gemini_api_key": "",
     "deepseek_api_key": "",
+    "openai_api_key": "",
     "wa_admin_numbers": "",
     "wa_owner_name": "User",
+    "wa_default_auto_reply": 1,
+    "wa_reply_mode": "all_contacts",
     "google_vision_key_path": "",
     "vision_provider": "ollama",
     "vision_model": "moondream",
@@ -257,15 +261,15 @@ def get_wa_contact(phone_number: str) -> dict:
 
 def get_all_wa_contacts():
     conn = _get_conn()
-    rows = conn.execute("SELECT phone_number, name, summary, rules FROM whatsapp_contacts ORDER BY name ASC").fetchall()
+    rows = conn.execute("SELECT phone_number, name, summary, rules, auto_reply FROM whatsapp_contacts ORDER BY name ASC").fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def save_wa_contact(phone_number: str, name: str, summary: str = "", rules: str = ""):
+def save_wa_contact(phone_number: str, name: str, summary: str = "", rules: str = "", auto_reply: int = 1):
     conn = _get_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO whatsapp_contacts (phone_number, name, summary, rules) VALUES (?, ?, ?, ?)",
-        (phone_number, name, summary, rules)
+        "INSERT OR REPLACE INTO whatsapp_contacts (phone_number, name, summary, rules, auto_reply) VALUES (?, ?, ?, ?, ?)",
+        (phone_number, name, summary, rules, auto_reply)
     )
     conn.commit()
     conn.close()

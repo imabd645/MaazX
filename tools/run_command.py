@@ -65,6 +65,8 @@ def run_command(command: str, working_directory: str = ".") -> str:
             text=True,
             timeout=60,
             cwd=cwd,
+            encoding='utf-8',
+            errors='replace'
         )
 
         output_parts = []

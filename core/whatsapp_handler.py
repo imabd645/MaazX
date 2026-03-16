@@ -7,6 +7,7 @@ import json
 import requests
 import database
 import openrouter_client
+import tools # noqa - triggers @register_tool decorators
 from core.deepseek_client import chat_completion_with_tools
 
 def handle_incoming_message(msg_data: dict):
@@ -50,13 +51,42 @@ def handle_incoming_message(msg_data: dict):
         except Exception as e:
             print(f"[File Porter] Error saving incoming file: {e}")
 
-    # 2. Retrieve Contact Rules and History
+    # 2. Retrieve Contact Rules, Settings and History
     contact = database.get_wa_contact(sender)
+    settings = database.load_settings()
     
-    # Optional: whitelist mode - if we only want to reply to known contacts, uncomment:
-    # if not contact:
-    #     print(f"Ignoring unknown sender: {sender}")
-    #     return
+    # 2a. Handle Permissions (Gatekeeping)
+    # Detect if sender is an admin
+    from config import WHATSAPP_ADMIN_NUMBERS
+    admin_str = settings.get("wa_admin_numbers", "")
+    dynamic_admins = [n.strip() for n in admin_str.split(",") if n.strip()]
+    is_admin = sender in WHATSAPP_ADMIN_NUMBERS or sender in dynamic_admins
+
+    # Global reply mode (admin_only, all_contacts, all_users, none)
+    reply_mode = settings.get("wa_reply_mode", "all_contacts")
+    global_default = settings.get("wa_default_auto_reply", 1)
+    
+    # Permission logic Hierarchy:
+    allowed = False
+    if reply_mode == "none":
+        allowed = False
+    elif reply_mode == "admin_only":
+        allowed = is_admin
+    elif reply_mode == "all_contacts":
+        # Allow admins OR saved contacts that haven't been explicitly disabled
+        allowed = is_admin or (contact is not None and bool(contact.get("auto_reply", 1)))
+    elif reply_mode == "all_users":
+        # Allow everyone unless they are explicitly disabled in contacts DB
+        if is_admin:
+            allowed = True
+        elif contact:
+            allowed = bool(contact.get("auto_reply", 1))
+        else:
+            allowed = bool(global_default)
+
+    if not allowed:
+        print(f"[WA Privacy] Skipping reply for {sender} | Mode: {reply_mode} | Admin: {is_admin}")
+        return
     
     contact_name = contact["name"] if contact and contact["name"] else "Unknown Contact"
     rules = contact["rules"] if contact and contact["rules"] else "Be helpful and conversational."
@@ -68,26 +98,14 @@ def handle_incoming_message(msg_data: dict):
     memories = database.get_memories(user_id=sender, include_global=True)
 
     # 4. Generate AI Reply
-    settings = database.load_settings()
     model_name = settings.get("model_name", "gemini-2.5-flash")
     owner_name = settings.get("wa_owner_name", "User")
-    
-    # Detect if sender is an admin
-    from config import WHATSAPP_ADMIN_NUMBERS
-
-    # Load settings to check for dynamic admin numbers
-    admin_str = settings.get("wa_admin_numbers", "")
-    # Parse comma-separated admin numbers
-    dynamic_admins = [n.strip() for n in admin_str.split(",") if n.strip()]
-    
-    # Check if sender is in the hardcoded config OR the dynamic list
-    is_admin = sender in WHATSAPP_ADMIN_NUMBERS or sender in dynamic_admins
     
     # Run Intent Classifier
     from core.intent_classifier import classify_intent
     intent = classify_intent(body)
     
-    print(f"\n[WA Debug] Sender: {sender} | Admin: {is_admin} | Intent: {intent}")
+    print(f"\n[WA Debug] Sender: {sender} | Admin: {is_admin} | Intent: {intent} | Mode: {reply_mode}")
     print(f"[WA Debug] User Message: {body}")
 
     # 3. Build the System Prompt
