@@ -39,6 +39,7 @@ def chat_completion(api_key: str, model_id: str, messages: list, tools: list = N
     payload = {
         "model": model_name,
         "messages": messages,
+        "max_tokens": 4096,
     }
 
     if tools:

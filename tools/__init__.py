@@ -16,8 +16,9 @@ import tools.list_directory
 import tools.search_files
 import tools.search_in_files
 
-# Shell
+# Shell & REPL
 import tools.run_command
+import tools.python_repl
 
 # WhatsApp
 import tools.send_whatsapp
@@ -33,6 +34,8 @@ import tools.inspect_database
 
 # Agent Memory
 import tools.whatsapp_admin
+import tools.whatsapp_search
+import tools.whatsapp_voice_vibe
 import tools.manage_memory
 import tools.query_knowledge
 
@@ -47,6 +50,7 @@ import tools.system_monitor
 
 # Git Manager
 import tools.git_manager
+import tools.github_tools
 
 # Webcam Control
 import tools.webcam

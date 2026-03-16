@@ -73,7 +73,14 @@ def api_chat():
     from core.intent_classifier import classify_intent
     intent = classify_intent(user_msg)
     
-    context_msg = user_msg # Simple for now
+    # Fetch memories for injection
+    owner_name = settings.get("wa_owner_name", "User")
+    memories = db.get_memories(user_id=owner_name, include_global=True)
+    memory_context = ""
+    if memories:
+        memory_context = "\n\nMy Long-Term Memories:\n" + "\n".join([f"- {k}: {v}" for k,v in memories.items()])
+    
+    context_msg = user_msg + memory_context
     
     db.save_chat_message(current_session_id, "user", user_msg)
 
@@ -81,17 +88,26 @@ def api_chat():
 
     # ── SSE Streaming Generator ──────────────────────────────
     def generate():
+        global session_messages
         nonlocal user_msg
         full_reply_text = ""
         all_executed_tools = []
         
         try:
-            # For now, only DeepSeek path supports streaming tools in this update
-            # We use the new stream function from deepseek_client
+            # Prepare initial message list
+            messages = [{"role": "system", "content": config.get_system_instruction()}] + session_messages + [{"role": "user", "content": context_msg}]
+            
+            # Determine current user context
+            owner_name = settings.get("wa_owner_name", "Admin")
+            
             stream_gen = deepseek_client.chat_completion_with_tools_stream(
-                messages=[{"role": "system", "content": config.get_system_instruction()}] + session_messages + [{"role": "user", "content": context_msg}],
+                messages=messages,
                 model_name=current_model,
-                allow_tools=(intent != "chat")
+                allow_tools=(intent != "chat"),
+                context_params={
+                    "user_id": owner_name, # Use owner name as personal memory ID for dashboard
+                    "is_admin": True       # Local dashboard user is ALWAYS admin
+                }
             )
 
             for chunk in stream_gen:
@@ -103,9 +119,22 @@ def api_chat():
                 # yield SSE format
                 yield f"data: {json.dumps(chunk)}\n\n"
 
-            # Finalize session history
-            session_messages.append({"role": "user", "content": context_msg})
-            session_messages.append({"role": "assistant", "content": full_reply_text})
+            # Fallback if model was silent after tool calls
+            if not full_reply_text and all_executed_tools:
+                full_reply_text = "I've completed the requested actions."
+                yield f"data: {json.dumps({'t': 'text', 'c': '\n\n' + full_reply_text})}\n\n"
+
+            # Finalize session history by capturing the UPDATED message list
+            new_session_history = messages[1:]
+            
+            # Ensure the last assistant message has the content we just generated if it was empty
+            if new_session_history and new_session_history[-1]["role"] == "assistant":
+                if not new_session_history[-1].get("content") and full_reply_text:
+                    new_session_history[-1]["content"] = full_reply_text
+            
+            session_messages = new_session_history
+            
+            # Save final conversational turn to DB history
             db.save_chat_message(current_session_id, "assistant", full_reply_text, all_executed_tools)
 
         except Exception as e:
@@ -286,8 +315,10 @@ def api_terminal():
 
     timeout = app_settings.get("command_timeout", 60)
     try:
+        # Enforce UTF-8 and replace errors to prevent UnicodeDecodeError on Windows
         result = subprocess.run(command, shell=True, capture_output=True, text=True,
-                                timeout=timeout, cwd=current_working_dir)
+                                timeout=timeout, cwd=current_working_dir, 
+                                encoding='utf-8', errors='replace')
         output = (result.stdout or "") + (result.stderr or "")
         entry = {"command": command, "output": output.strip() or "(no output)",
                  "exit_code": result.returncode, "cwd": current_working_dir}
@@ -616,16 +647,8 @@ def api_set_settings():
     # Persist to SQLite
     db.save_settings(app_settings)
 
-    # Rebuild model if needed
-    if changed_model:
-        new_model = app_settings["model_name"]
-        if _is_openrouter_model(new_model):
-            openrouter_messages = []
-        else:
-            try:
-                model, chat = _build_gemini_model(new_model)
-            except Exception as e:
-                return jsonify({"error": f"Failed to switch model: {e}"}), 400
+    # Note: Refactored architecture uses deepseek_client which is stateless.
+    # Changing the model name in settings is sufficient for the next chat call.
 
     return jsonify(app_settings)
 

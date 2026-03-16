@@ -174,9 +174,55 @@ app.post('/send', async (req, res) => {
     }
 });
 
+// REST endpoint to post a WhatsApp Status (Broadcast)
+app.post('/status', async (req, res) => {
+    const { message, filePath, caption } = req.body;
+
+    try {
+        if (filePath) {
+            if (!fs.existsSync(filePath)) {
+                return res.status(404).json({ error: 'File not found on disk: ' + filePath });
+            }
+            const media = MessageMedia.fromFilePath(filePath);
+            await client.sendMessage('status@broadcast', media, { caption: caption || '' });
+            console.log(`[Status Media] Posted: ${filePath}`);
+        } else if (message) {
+            await client.sendMessage('status@broadcast', message);
+            console.log(`[Status Text] Posted: ${message}`);
+        } else {
+            return res.status(400).json({ error: 'Missing "message" or "filePath" fields' });
+        }
+
+        res.json({ success: true, message: 'Status posted successfully' });
+    } catch (err) {
+        console.error('Error posting WhatsApp status:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// REST endpoint to react to a message with an emoji
+app.post('/react', async (req, res) => {
+    const { messageId, emoji } = req.body;
+    if (!messageId || !emoji) {
+        return res.status(400).json({ error: 'Missing "messageId" or "emoji" fields' });
+    }
+
+    try {
+        const msg = await client.getMessageById(messageId);
+        if (!msg) return res.status(404).json({ error: 'Message not found: ' + messageId });
+
+        await msg.react(emoji);
+        res.json({ success: true, message: `Reacted with ${emoji}` });
+        console.log(`[Reaction] ${messageId}: ${emoji}`);
+    } catch (err) {
+        console.error('Error reacting to message:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // REST endpoint for the Python backend to send Images/Media back to WhatsApp
 app.post('/send_media', async (req, res) => {
-    const { to, filePath, caption } = req.body;
+    const { to, filePath, caption, isPtt } = req.body;
     if (!to || !filePath) {
         return res.status(400).json({ error: 'Missing "to" or "filePath" fields' });
     }
@@ -193,11 +239,14 @@ app.post('/send_media', async (req, res) => {
         }
 
         const media = MessageMedia.fromFilePath(filePath);
-        const options = caption ? { caption: caption } : {};
+        const options = {
+            caption: caption || '',
+            sendAudioAsVoice: !!isPtt // Enable Push-To-Talk style for audio
+        };
 
         const sentMsg = await client.sendMessage(chatId, media, options);
         res.json({ success: true, messageId: sentMsg.id._serialized });
-        console.log(`[Outgoing Media] ${to}: ${filePath}`);
+        console.log(`[Outgoing Media] ${to}: ${filePath} (PTT: ${!!isPtt})`);
     } catch (err) {
         console.error('Error sending WhatsApp media:', err.message);
         res.status(500).json({ error: err.message });
@@ -240,6 +289,67 @@ app.post('/unblock', async (req, res) => {
         console.log(`[Unblocked] ${chatId}`);
     } catch (err) {
         console.error('Error unblocking contact:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// REST endpoint to search for contacts
+app.get('/contacts/search', async (req, res) => {
+    const { query } = req.query;
+    if (!query) return res.status(400).json({ error: 'Missing "query" parameter' });
+
+    try {
+        const contacts = await client.getContacts();
+        const searchLower = query.toLowerCase();
+
+        const results = contacts
+            .filter(c => {
+                const nameMatch = c.name && c.name.toLowerCase().includes(searchLower);
+                const pushMatch = c.pushname && c.pushname.toLowerCase().includes(searchLower);
+                const phoneMatch = c.number && c.number.includes(query);
+                return nameMatch || pushMatch || phoneMatch;
+            })
+            .map(c => ({
+                id: c.id._serialized,
+                name: c.name || c.pushname || 'Unknown',
+                number: c.number,
+                isGroup: c.isGroup,
+                isMyContact: c.isMyContact
+            }))
+            .slice(0, 50); // Limit to 50 results
+
+        res.json({ success: true, results });
+    } catch (err) {
+        console.error('Error searching contacts:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// REST endpoint to search for messages globally
+app.get('/messages/search', async (req, res) => {
+    const { query, limit } = req.query;
+    if (!query) return res.status(400).json({ error: 'Missing "query" parameter' });
+
+    try {
+        const searchOptions = {
+            limit: parseInt(limit) || 20
+        };
+
+        const messages = await client.searchMessages(query, searchOptions);
+
+        const results = messages.map(m => ({
+            id: m.id._serialized,
+            from: m.from,
+            to: m.to,
+            body: m.body,
+            timestamp: m.timestamp,
+            fromMe: m.fromMe,
+            type: m.type
+        }));
+
+        res.json({ success: true, results });
+    } catch (err) {
+        console.error('Error searching messages:', err.message);
         res.status(500).json({ error: err.message });
     }
 });

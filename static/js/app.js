@@ -847,6 +847,9 @@ async function loadSettings() {
         const elGemini = document.getElementById('setting-gemini-key');
         if (elGemini) elGemini.value = s.gemini_api_key || '';
 
+        const elOpenAI = document.getElementById('setting-openai-key');
+        if (elOpenAI) elOpenAI.value = s.openai_api_key || '';
+
         const elAdmins = document.getElementById('setting-wa-admins');
         if (elAdmins) elAdmins.value = s.wa_admin_numbers || '';
 
@@ -867,6 +870,9 @@ async function loadSettings() {
 
         const elLLMLocalModel = document.getElementById('setting-llm-local-model');
         if (elLLMLocalModel) elLLMLocalModel.value = s.llm_local_model || 'qwen3:8b';
+
+        const elWaReplyMode = document.getElementById('setting-wa-reply-mode');
+        if (elWaReplyMode) elWaReplyMode.value = s.wa_reply_mode || 'all_contacts';
     } catch { /* ignore */ }
 }
 
@@ -880,6 +886,7 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         openrouter_api_key: document.getElementById('setting-openrouter-key')?.value?.trim() || '',
         deepseek_api_key: document.getElementById('setting-deepseek-key')?.value?.trim() || '',
         gemini_api_key: document.getElementById('setting-gemini-key')?.value?.trim() || '',
+        openai_api_key: document.getElementById('setting-openai-key')?.value?.trim() || '',
         wa_admin_numbers: document.getElementById('setting-wa-admins')?.value?.trim() || '',
         wa_owner_name: document.getElementById('setting-wa-owner')?.value?.trim() || 'User',
         google_vision_key_path: document.getElementById('setting-vision-path')?.value?.trim() || '',
@@ -887,6 +894,7 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         vision_model: document.getElementById('setting-vision-model')?.value || 'moondream',
         llm_provider: document.getElementById('setting-llm-provider')?.value || 'deepseek',
         llm_local_model: document.getElementById('setting-llm-local-model')?.value?.trim() || 'qwen3:8b',
+        wa_reply_mode: document.getElementById('setting-wa-reply-mode')?.value || 'all_contacts',
     };
 
     try {
@@ -914,7 +922,13 @@ document.getElementById('setting-save').addEventListener('click', async () => {
                 'gemini-2.0-flash': 'Gemini 2.0 Flash',
                 'gemini-2.5-pro': 'Gemini 2.5 Pro',
                 'gemini-2.0-pro': 'Gemini 2.0 Pro',
+                'gemini-1.5-pro': 'Gemini 1.5 Pro',
+                'gemini-1.5-flash': 'Gemini 1.5 Flash',
                 'gemma-3-27b': 'Gemma 3 27B',
+                'gpt-4.1-mini': 'GPT-4.1 Mini',
+                'gpt-4.1-nano': 'GPT-4.1 Nano',
+                'gpt-4o': 'GPT-4o',
+                'gpt-4o-mini': 'GPT-4o Mini',
             };
             badge.textContent = modelNames[settings.model_name] || settings.model_name;
         }

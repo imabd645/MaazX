@@ -7,6 +7,7 @@ NOTE: Do not run this file directly. Use the root  agent.py  as the entry point.
 
 import datetime
 import config
+import tools # noqa - triggers @register_tool decorators
 from core.deepseek_client import chat_completion_with_tools
 from core.intent_classifier import classify_intent
 
@@ -42,6 +43,8 @@ class Agent:
                 model_name=config.MODEL_NAME,
                 allow_tools=allow_tools
             )
+            # CRITICAL: Preserve the full history (tool turns, etc.) so the agent doesn't "forget" its status
+            self.messages = result.get("history", self.messages)
             return result["reply"]
         except Exception as e:
             # Revert the user message so they can re-try

@@ -49,3 +49,36 @@ def send_whatsapp(contact_name_or_phone: str, message: str) -> str:
         return f"Success! WhatsApp message sent to {matched_name} ({matched_phone})."
     except Exception as e:
         return f"Failed to send WhatsApp message to {matched_phone}: {e}"
+
+@register_tool
+def post_whatsapp_status(message: str = None, image_path: str = None) -> str:
+    """Posts a status update (story) to your WhatsApp.
+    You can post a text-only status or an image/video status with an optional caption.
+    
+    Args:
+        message: The text content for the status or caption for the media.
+        image_path: Optional. Local absolute path to an image or video file to post as status.
+    """
+    try:
+        payload = {}
+        if image_path:
+            import os
+            if not os.path.exists(image_path):
+                return f"Error: Media file not found at {image_path}"
+            payload["filePath"] = os.path.abspath(image_path)
+            if message:
+                payload["caption"] = message
+        elif message:
+            payload["message"] = message
+        else:
+            return "Error: You must provide either a text message or an image_path for the status."
+
+        res = requests.post(
+            "http://127.0.0.1:3000/status",
+            json=payload,
+            timeout=20
+        )
+        res.raise_for_status()
+        return "Success! WhatsApp status has been posted."
+    except Exception as e:
+        return f"Failed to post WhatsApp status: {e}"

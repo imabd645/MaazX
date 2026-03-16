@@ -299,6 +299,12 @@
                                             <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                                             <option value="gemini-2.0-pro">Gemini 2.0 Pro</option>
                                         </optgroup>
+                                        <optgroup label="OpenAI (Cloud)">
+                                            <option value="gpt-4.1-mini">GPT-4.1 Mini (Ultra Fast)</option>
+                                            <option value="gpt-4.1-nano">GPT-4.1 Nano (Zero Latency)</option>
+                                            <option value="gpt-4o">GPT-4o (Standard)</option>
+                                            <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                        </optgroup>
                                         <optgroup label="OpenRouter">
                                             <option value="gemma-3-27b">Gemma 3 27B</option>
                                         </optgroup>
@@ -317,6 +323,8 @@
                                     <label class="setting-label">Main LLM Provider</label>
                                     <select class="setting-input" id="setting-llm-provider">
                                         <option value="deepseek">DeepSeek (Cloud - Smartest)</option>
+                                        <option value="openai">OpenAI (Cloud - Fast)</option>
+                                        <option value="gemini">Google Gemini (Native)</option>
                                         <option value="ollama">Ollama (Local - Private & Free)</option>
                                     </select>
                                     <span class="setting-hint">The "Primary Brain" of your agent</span>
@@ -332,6 +340,13 @@
                                 <div class="setting-group">
                                     <label class="setting-label">DeepSeek API Key</label>
                                     <input type="password" class="setting-input" id="setting-deepseek-key"
+                                        placeholder="sk-...">
+                                    <span class="setting-hint">Overrides .env/config if set</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">OpenAI API Key</label>
+                                    <input type="password" class="setting-input" id="setting-openai-key"
                                         placeholder="sk-...">
                                     <span class="setting-hint">Overrides .env/config if set</span>
                                 </div>
@@ -377,6 +392,18 @@
                                     <span class="setting-hint">The name the AI agent uses to refer to you when chatting
                                         with
                                         others on WhatsApp.</span>
+                                </div>
+
+                                <div class="setting-group">
+                                    <label class="setting-label">Auto-Reply Mode</label>
+                                    <select class="setting-input" id="setting-wa-reply-mode">
+                                        <option value="admin_only">Admin Only (Most Private)</option>
+                                        <option value="all_contacts">All Contacts (Trusted Only)</option>
+                                        <option value="all_users">All Users (Open Access)</option>
+                                        <option value="none">None (Disabled)</option>
+                                    </select>
+                                    <span class="setting-hint">Control who the AI agent automatically replies to on
+                                        WhatsApp.</span>
                                 </div>
                             </div>
 

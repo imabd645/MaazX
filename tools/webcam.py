@@ -25,16 +25,20 @@ def take_webcam_photo(send_to_whatsapp: str = None) -> str:
         filename = f"webcam_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         filepath = os.path.join(media_dir, filename)
         
-        # 1. Initialize camera
-        cap = cv2.VideoCapture(0)
+        # 1. Initialize camera with CAP_DSHOW for better Windows performance if possible
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(0) # Fallback
+            
         if not cap.isOpened():
             return "Error: Could not open webcam. Ensure it is connected and not in use by another app."
             
-        # 2. Warm up the camera (important for exposure/focus)
-        # We discard the first few frames to allow auto-exposure to adjust
-        time.sleep(2)
-        for _ in range(10):
+        # 2. Warm up the camera (CRITICAL for exposure/focus)
+        # Increased discard count and added tiny sleeps for hardware stabilization
+        time.sleep(1.0)
+        for _ in range(30):
             cap.read()
+            time.sleep(0.02)
         
         # 3. Capture final frame
         ret, frame = cap.read()

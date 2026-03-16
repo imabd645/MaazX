@@ -26,6 +26,8 @@ wheels/
 # SQLite
 *.db
 *.sqlite3
+agent_data.db
+repl_sessions.json
 
 # Node.js
 node_modules/
@@ -52,8 +54,21 @@ Thumbs.db
 chroma_db/
 codebase_index/
 .chroma/
+# Exclude indexing of large data files
+*.json
+!package.json
+!composer.json
+!manifest.json
 
 # Secrets & Credentials
 credentials.json
 agent_secrets.env
 .gemini/
+agent_data.db-shm
+agent_data.db-wal
+test_repl_tool.py
+.gitignore
+test_whatsapp_privacy.py
+.chroma/9f077afa-370e-4a6a-9b2d-d08b0bef12f7/length.bin
+.chroma/9f077afa-370e-4a6a-9b2d-d08b0bef12f7/length.bin
+__pycache__/config.cpython-312.pyc
