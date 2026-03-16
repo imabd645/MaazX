@@ -1,4 +1,5 @@
 # 🦁 MaazX Autonomous AI Agent v3.10 
+*Developed by( **Abdullah Masood** )*
 
 **MaazX** is a production-grade, fully autonomous AI engineering agent. It resides directly on your hardware, bridging the intelligence of frontier Large Language Models (DeepSeek, Gemini, OpenAI) with the raw power of your local operating system.You can control it through **Localhost** ,**Whatsapp**. It can become your Whatsapp assistant and can reply to messages and also read your mails and summarise them for you
 
