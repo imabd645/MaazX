@@ -318,85 +318,14 @@ def template_function(param: str) -> str:
 
 MaazX is the future of autonomous engineering. It acts as your second brain, handling the mechanical tasks while you think.
 
-*Developed by Abdullah Masood.*
+***Developed by Abdullah Masood.***
 *Current Status: Stable.*
-*Year: 2026.*
+
 
 ---
 
-### Detailed Case Study Appendix (Logs)
 
-#### Log Scenario 1: File Patching
-> CALL: read_file("main.py")
-> RESP: Success.
-> CALL: patch_file("main.py", [{"target": "...", "repl": "..."}])
-> RESP: Success (Diff generated).
 
-#### Log Scenario 2: Web Scraping
-> CALL: search_web("Latest AI news")
-> RESP: 3 Results.
-> CALL: read_webpage("https://news.com/1")
-> RESP: Markdown content.
-
----
-
-### Detailed Database Column Descriptions
-
-**Table: `scheduled_tasks`**
-- `id`: Unique identifier.
-- `execute_at`: The datetime for firing.
-- `command`: JSON string of parameters.
-- `status`: Lifecycle (queued/executed).
-- `last_error`: Traceback of failed runs.
-
-**Table: `api_logs`**
-- `timestamp`: Execution time.
-- `method`: Tool name.
-- `latency`: Ms taken to execute.
-
----
-
-### Comparison Matrix: MaazX vs Traditional Bots
-| Feature | Traditional | MaazX |
-| :--- | :--- | :--- |
-| File IO | Suggests only | Directly writes |
-| Shell | Manual copy-paste | Direct execution |
-| Vision | Static Upload | Live Screen Analysis |
-| WhatsApp | No access | Full Bi-directional |
-
----
-
-### Operational Maintenance Checklist
-- [ ] Prune `repl_sessions.json` monthly.
-- [ ] Backup `agent_data.db` weekly.
-- [ ] Scan logs for unexpected 403s.
-- [ ] Verify `GITHUB_TOKEN` expiry.
-
----
-
-*(Continuing Document for Length Target)*
-*(Section: Architectural Deep Dive)*
-
-The inner core of the agent uses a **Dispatcher-Registry** pattern. This ensures that the heart of the engine never needs to change when a new tool is added.
-
-**Registry Mechanism**:
-1. Tool file is scanned.
-2. Tool function is imported.
-3. Docstring is parsed into a JSON Schema.
-4. Schema is sent to DeepSeek/Gemini.
-
----
-
-### Final Glossary Additions
-- **WAL-Mode**: SQLite logging style.
-- **Headless**: Browser without UI.
-- **Daemon**: Back-end persistent thread.
-- **Hook**: Trigger point in logic.
-- **Payload**: The data sent to an API.
-- **Endpoint**: The target of a network call.
-- **JSON**: Preferred data exchange format.
-
----
 
 *End of Document.*
 
