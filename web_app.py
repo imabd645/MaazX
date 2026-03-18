@@ -77,6 +77,13 @@ def index():
 def api_chat():
     global session_messages
     _abort_chat.clear()  # Reset abort flag at start of each request
+    
+    # ── Memory Summarization ──
+    from core.memory_summarizer import summarize_if_needed
+    summarize_if_needed("chat", current_session_id)
+    # Reload session messages in case old ones were pruned
+    session_messages = _restore_session_messages(current_session_id)
+    
     data = request.get_json()
     user_msg = data.get("message", "").strip()
     if not user_msg:

@@ -91,6 +91,10 @@ def handle_incoming_message(msg_data: dict):
     contact_name = contact["name"] if contact and contact["name"] else "Unknown Contact"
     rules = contact["rules"] if contact and contact["rules"] else "Be helpful and conversational."
 
+    # ── Memory Summarization ──
+    from core.memory_summarizer import summarize_if_needed
+    summarize_if_needed("whatsapp", sender)
+
     # Get the last 40 messages for context (to avoid cutting off tool turns)
     history = database.get_wa_history(sender, limit=40)
 

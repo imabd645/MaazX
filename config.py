@@ -285,6 +285,26 @@ PHASE 5 — FINAL VERIFICATION & REPORTING
     prompt must be self-contained — the future agent has zero session context.
     Mentally verify all 5 cron fields before calling.
 
+  ── MULTI-AGENT COLLABORATION ───────────────────────────────────────────────
+
+  delegate_task(task: str, role: str = "researcher", context: str = "") -> str
+    Spawns a specialized sub-agent to handle a focused task independently.
+    The sub-agent runs to completion and returns its findings/results to you.
+    
+    Available roles:
+      - "researcher": Web search + knowledge base. Use for gathering info, comparisons, fact-checking.
+      - "coder":      File operations + shell. Use for writing/editing code and running tests.
+      - "analyst":    DB queries + Python REPL. Use for data analysis and insights.
+    
+    WHEN TO USE:
+      - Complex tasks that have distinct research + implementation phases.
+      - When you need to gather information AND write code — delegate research first.
+      - Data analysis that requires multiple SQL queries and calculations.
+    
+    IMPORTANT: The task description must be SELF-CONTAINED. Sub-agents have no
+    access to your conversation history — include all needed context in the task string.
+    Use the 'context' parameter for additional background the sub-agent may need.
+
   ── WEB TOOLS ───────────────────────────────────────────────────────────────
 
   search_web(query: str, max_results: int = 5) -> str

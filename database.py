@@ -228,6 +228,50 @@ def delete_chat_session(session: str):
     conn.close()
 
 
+def count_chat_messages(session: str) -> int:
+    """Return the total number of messages in a session."""
+    conn = _get_conn()
+    row = conn.execute("SELECT COUNT(*) as count FROM chat_history WHERE session = ?", (session,)).fetchone()
+    conn.close()
+    return row["count"] if row else 0
+
+
+def get_oldest_chat_messages(session: str, count: int):
+    """Return the oldest 'count' messages for a given session."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id, role, content, tool_calls, timestamp FROM chat_history WHERE session = ? ORDER BY id ASC LIMIT ?",
+        (session, count),
+    ).fetchall()
+    conn.close()
+    return [
+        {
+            "id": row["id"],
+            "role": row["role"],
+            "content": row["content"],
+            "tool_calls": json.loads(row["tool_calls"]),
+            "timestamp": row["timestamp"],
+        }
+        for row in rows
+    ]
+
+
+def delete_oldest_chat_messages(session: str, count: int):
+    """Delete the oldest 'count' messages for a specific session."""
+    conn = _get_conn()
+    conn.execute("""
+        DELETE FROM chat_history 
+        WHERE id IN (
+            SELECT id FROM chat_history 
+            WHERE session = ? 
+            ORDER BY id ASC 
+            LIMIT ?
+        )
+    """, (session, count))
+    conn.commit()
+    conn.close()
+
+
 # ── Terminal History ────────────────────────────────────────
 def save_terminal_entry(command: str, output: str, exit_code: int, cwd: str):
     """Save a terminal command + output."""
@@ -334,6 +378,57 @@ def delete_wa_latest_messages(phone_number: str, count: int):
             SELECT id FROM whatsapp_messages 
             WHERE phone_number = ? 
             ORDER BY id DESC 
+            LIMIT ?
+        )
+    """, (phone_number, count))
+    conn.commit()
+    conn.close()
+
+
+def count_wa_messages(phone_number: str) -> int:
+    """Return the total number of messages for a contact."""
+    conn = _get_conn()
+    row = conn.execute("SELECT COUNT(*) as count FROM whatsapp_messages WHERE phone_number = ?", (phone_number,)).fetchone()
+    conn.close()
+    return row["count"] if row else 0
+
+
+def get_oldest_wa_messages(phone_number: str, count: int):
+    """Return the oldest 'count' messages for a contact."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id, role, content, tool_calls, tool_call_id, name, timestamp FROM whatsapp_messages WHERE phone_number = ? ORDER BY id ASC LIMIT ?",
+        (phone_number, count)
+    ).fetchall()
+    conn.close()
+    
+    history = []
+    for row in rows:
+        msg = {
+            "id": row["id"],
+            "role": row["role"],
+            "content": row["content"],
+            "timestamp": row["timestamp"]
+        }
+        if row["tool_calls"] and row["tool_calls"] != "[]":
+            msg["tool_calls"] = json.loads(row["tool_calls"])
+        if row["tool_call_id"]:
+            msg["tool_call_id"] = row["tool_call_id"]
+        if row["name"]:
+            msg["name"] = row["name"]
+        history.append(msg)
+    return history
+
+
+def delete_oldest_wa_messages(phone_number: str, count: int):
+    """Delete the oldest 'count' messages for a specific contact."""
+    conn = _get_conn()
+    conn.execute("""
+        DELETE FROM whatsapp_messages 
+        WHERE id IN (
+            SELECT id FROM whatsapp_messages 
+            WHERE phone_number = ? 
+            ORDER BY id ASC 
             LIMIT ?
         )
     """, (phone_number, count))
