@@ -11,8 +11,8 @@
   - [x] Verify: Scientific functions work with test values
 - [x] Step 4: Implement memory functions (M+, M-, MR, MC)
   - [x] Verify: Memory operations work correctly
-- [ ] Step 5: Implement history feature
-  - [ ] Verify: History displays previous calculations
+- [x] Step 5: Implement history feature
+  - [x] Verify: History displays previous calculations
 - [ ] Step 6: Add keyboard support
   - [ ] Verify: Keyboard inputs work for numbers and operations
 - [ ] Step 7: Create requirements.txt for calculator
