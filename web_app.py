@@ -195,6 +195,122 @@ def api_get_session():
     return jsonify({"session_id": current_session_id, "messages": messages})
 
 
+# ── Database GUI ──────────────────────────────────────────────
+import sqlite3
+
+def _dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+@app.route("/api/db/list", methods=["GET"])
+def api_db_list():
+    """Find local SQLite databases in the CWD up to depth 3."""
+    db_files = []
+    base_depth = current_working_dir.count(os.sep)
+    for root, dirs, files in os.walk(current_working_dir):
+        # Limit depth to 3 levels to avoid traversing huge codebases for .db
+        if root.count(os.sep) - base_depth > 2:
+            dirs[:] = []
+            continue
+        for f in files:
+            if f.endswith(".db") or f.endswith(".sqlite"):
+                full_path = os.path.join(root, f)
+                rel_path = os.path.relpath(full_path, current_working_dir)
+                try:
+                    size_mb = os.path.getsize(full_path) / (1024 * 1024)
+                except Exception as e:
+                    size_mb = 0.0
+                db_files.append({"path": full_path, "name": f, "rel_path": rel_path, "size_mb": round(size_mb, 2)})
+    return jsonify({"databases": sorted(db_files, key=lambda x: x['name'])})
+
+@app.route("/api/db/info", methods=["GET"])
+def api_db_info():
+    """Get all tables and row counts for a specific SQLite database."""
+    db_path = request.args.get("db")
+    if not db_path or not os.path.exists(db_path):
+        return jsonify({"error": "Database not found"}), 404
+        
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        tables = [row[0] for row in cur.fetchall()]
+        
+        table_info = []
+        for t in tables:
+            try:
+                cur.execute(f"SELECT COUNT(*) FROM `{t}`")
+                count = cur.fetchone()[0]
+                table_info.append({"name": t, "row_count": count})
+            except:
+                table_info.append({"name": t, "row_count": "?"})
+            
+        conn.close()
+        return jsonify({"tables": table_info})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/db/table", methods=["GET"])
+def api_db_table():
+    """Fetch schema columns and initial rows for a table."""
+    db_path = request.args.get("db")
+    table = request.args.get("table")
+    limit = request.args.get("limit", 100, type=int)
+    
+    if not db_path or not os.path.exists(db_path):
+        return jsonify({"error": "Database not found"}), 404
+        
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = _dict_factory
+        cur = conn.cursor()
+        
+        # Get schema
+        cur.execute(f"PRAGMA table_info(`{table}`)")
+        columns = [row for row in cur.fetchall()]
+        
+        # Get data
+        cur.execute(f"SELECT * FROM `{table}` LIMIT ?", (limit,))
+        rows = cur.fetchall()
+        
+        conn.close()
+        return jsonify({"columns": columns, "rows": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/db/query", methods=["POST"])
+def api_db_query():
+    """Execute arbitrary raw SQL query."""
+    data = request.get_json()
+    db_path = data.get("db")
+    query = data.get("query")
+    
+    if not db_path or not os.path.exists(db_path):
+        return jsonify({"error": "Database not found"}), 404
+    if not query:
+         return jsonify({"error": "Query is empty"}), 400
+         
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = _dict_factory
+        cur = conn.cursor()
+        
+        cur.execute(query)
+        if query.strip().upper().startswith(("INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER")):
+            conn.commit()
+            rows_affected = cur.rowcount
+            conn.close()
+            return jsonify({"message": "Success", "rows_affected": rows_affected, "is_mutation": True})
+        else:
+            rows = cur.fetchall()
+            columns = [{"name": desc[0]} for desc in cur.description] if cur.description else []
+            conn.close()
+            return jsonify({"columns": columns, "rows": rows, "is_mutation": False})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # ── Files & Folders ──────────────────────────────────────────
 
 

@@ -28,7 +28,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail', 'btn-db'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -41,7 +41,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'welcome', 'terminal-panel'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'db-area', 'welcome', 'terminal-panel'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -99,6 +99,14 @@ if (document.getElementById('btn-health')) {
     });
 }
 
+if (document.getElementById('btn-db')) {
+    document.getElementById('btn-db').addEventListener('click', () => {
+        switchSidebarTab('btn-db');
+        document.getElementById('db-area').style.display = 'flex';
+        typeof loadDatabases === 'function' && loadDatabases();
+    });
+}
+
 if (document.getElementById('btn-history')) {
     document.getElementById('btn-history').addEventListener('click', () => {
         switchSidebarTab('btn-history');
@@ -131,7 +139,7 @@ if (document.getElementById('btn-tools')) {
 document.querySelectorAll('.btn-close-panel').forEach(btn => {
     btn.addEventListener('click', () => {
         // Hide all center pane areas and terminal
-        ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'terminal-panel'].forEach(id => {
+        ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'db-area', 'terminal-panel'].forEach(id => {
             let el = document.getElementById(id);
             if (el) el.style.display = 'none';
         });
@@ -1967,3 +1975,192 @@ setInterval(() => {
     }
 }, 5000);
 
+
+/* ── Database Explorer Logic ──────────────────────────────── */
+function loadDatabases() {
+    fetch('/api/db/list').then(res => res.json()).then(data => {
+        const selector = document.getElementById('db-selector');
+        if (!selector) return;
+        selector.innerHTML = '<option value="">Select Database...</option>';
+        if (data.databases) {
+            data.databases.forEach(db => {
+                let opt = document.createElement('option');
+                opt.value = db.path;
+                opt.textContent = `${db.name} (${db.size_mb} MB)`;
+                selector.appendChild(opt);
+            });
+        }
+    }).catch(err => console.error(err));
+}
+
+function loadDatabaseTables(dbPath) {
+    const list = document.getElementById('db-table-list');
+    list.innerHTML = '<div style="color:var(--text-muted); font-size:12px; text-align:center; margin-top: 20px;">Loading tables...</div>';
+
+    fetch(`/api/db/info?db=${encodeURIComponent(dbPath)}`)
+        .then(res => res.json())
+        .then(data => {
+            list.innerHTML = '';
+            if (data.error) {
+                list.innerHTML = `<div style="color:var(--red); font-size:12px; padding:10px;">Error: ${data.error}</div>`;
+                return;
+            }
+            if (!data.tables || data.tables.length === 0) {
+                list.innerHTML = '<div style="color:var(--text-muted); font-size:12px; text-align:center; margin-top: 20px;">No tables found</div>';
+                return;
+            }
+
+            data.tables.forEach(t => {
+                let item = document.createElement('div');
+                item.className = 'db-table-item';
+                item.innerHTML = `<span>${t.name}</span> <span class="db-row-count">${t.row_count}</span>`;
+                item.onclick = () => {
+                    document.querySelectorAll('.db-table-item').forEach(el => el.classList.remove('active'));
+                    item.classList.add('active');
+                    renderTableData(dbPath, t.name);
+                };
+                list.appendChild(item);
+            });
+        }).catch(err => {
+            list.innerHTML = `<div style="color:var(--red); font-size:12px; padding:10px;">Error loading tables</div>`;
+        });
+}
+
+function renderTableData(dbPath, tableName) {
+    document.getElementById('db-current-table').textContent = tableName;
+    const btnRefresh = document.getElementById('db-refresh-btn');
+    const btnQuery = document.getElementById('db-query-btn');
+
+    btnRefresh.style.display = 'inline-block';
+    btnQuery.style.display = 'inline-block';
+
+    btnRefresh.onclick = () => renderTableData(dbPath, tableName);
+    btnQuery.onclick = () => {
+        const query = prompt(`Enter custom SQL query for ${dbPath}:`, `SELECT * FROM \`${tableName}\` LIMIT 10`);
+        if (query) executeCustomQuery(dbPath, query);
+    };
+
+    const thead = document.getElementById('db-thead');
+    const tbody = document.getElementById('db-tbody');
+    thead.innerHTML = '<tr><th>Loading data...</th></tr>';
+    tbody.innerHTML = '';
+
+    fetch(`/api/db/table?db=${encodeURIComponent(dbPath)}&table=${encodeURIComponent(tableName)}&limit=100`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                thead.innerHTML = '';
+                tbody.innerHTML = `<tr><td style="color:var(--red)">Error: ${data.error}</td></tr>`;
+                return;
+            }
+
+            let trHead = document.createElement('tr');
+            data.columns.forEach(col => {
+                let th = document.createElement('th');
+                th.textContent = col.name;
+                trHead.appendChild(th);
+            });
+            thead.innerHTML = '';
+            thead.appendChild(trHead);
+
+            tbody.innerHTML = '';
+            if (!data.rows || data.rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${data.columns.length}" style="text-align:center; color:var(--text-muted); padding:20px;">Table is empty</td></tr>`;
+            } else {
+                data.rows.forEach(row => {
+                    let tr = document.createElement('tr');
+                    data.columns.forEach(col => {
+                        let td = document.createElement('td');
+                        td.textContent = row[col.name];
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            }
+        }).catch(err => {
+            thead.innerHTML = '';
+            tbody.innerHTML = `<tr><td style="color:var(--red)">Connection Error</td></tr>`;
+        });
+}
+
+function executeCustomQuery(dbPath, query) {
+    const thead = document.getElementById('db-thead');
+    const tbody = document.getElementById('db-tbody');
+    thead.innerHTML = '<tr><th>Executing query...</th></tr>';
+    tbody.innerHTML = '';
+
+    fetch('/api/db/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ db: dbPath, query: query })
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                thead.innerHTML = '<tr><th style="color:var(--red)">Query Error</th></tr>';
+                tbody.innerHTML = `<tr><td style="color:var(--red)">${data.error}</td></tr>`;
+                return;
+            }
+
+            if (data.is_mutation) {
+                thead.innerHTML = '<tr><th style="color:var(--green)">Success</th></tr>';
+                tbody.innerHTML = `<tr><td>Rows affected: ${data.rows_affected}</td></tr>`;
+                loadDatabaseTables(dbPath);
+            } else {
+                let trHead = document.createElement('tr');
+                if (data.columns && data.columns.length > 0) {
+                    data.columns.forEach(col => {
+                        let th = document.createElement('th');
+                        th.textContent = col.name;
+                        trHead.appendChild(th);
+                    });
+                    thead.innerHTML = '';
+                    thead.appendChild(trHead);
+
+                    tbody.innerHTML = '';
+                    if (!data.rows || data.rows.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="${data.columns.length}" style="text-align:center; color:var(--text-muted); padding:20px;">No results</td></tr>`;
+                    } else {
+                        data.rows.forEach(row => {
+                            let tr = document.createElement('tr');
+                            Object.values(row).forEach(val => {
+                                let td = document.createElement('td');
+                                td.textContent = val;
+                                tr.appendChild(td);
+                            });
+                            tbody.appendChild(tr);
+                        });
+                    }
+                } else {
+                    thead.innerHTML = '<tr><th>Result</th></tr>';
+                    tbody.innerHTML = `<tr><td>Query executed successfully, no data returned.</td></tr>`;
+                }
+            }
+        })
+        .catch(err => {
+            thead.innerHTML = '';
+            tbody.innerHTML = `<tr><td style="color:var(--red)">Connection Error</td></tr>`;
+        });
+}
+
+const dbSelector = document.getElementById('db-selector');
+if (dbSelector) {
+    dbSelector.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val) {
+            loadDatabaseTables(val);
+            document.getElementById('db-thead').innerHTML = '';
+            document.getElementById('db-tbody').innerHTML = '';
+            document.getElementById('db-current-table').textContent = 'Select a table';
+            document.getElementById('db-refresh-btn').style.display = 'none';
+            document.getElementById('db-query-btn').style.display = 'none';
+        } else {
+            document.getElementById('db-table-list').innerHTML = '<div style="color:var(--text-muted); font-size:12px; text-align:center; margin-top: 20px;">No database selected</div>';
+            document.getElementById('db-thead').innerHTML = '';
+            document.getElementById('db-tbody').innerHTML = '';
+            document.getElementById('db-current-table').textContent = 'Select a table';
+            document.getElementById('db-refresh-btn').style.display = 'none';
+            document.getElementById('db-query-btn').style.display = 'none';
+        }
+    });
+}
