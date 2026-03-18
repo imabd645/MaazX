@@ -7,8 +7,8 @@
   - [x] Verify: File exists and can be imported
 - [x] Step 2: Implement basic arithmetic operations
   - [x] Verify: Calculator performs +, -, *, / correctly
-- [ ] Step 3: Implement scientific functions (sin, cos, tan, log, exp, sqrt, etc.)
-  - [ ] Verify: Scientific functions work with test values
+- [x] Step 3: Implement scientific functions (sin, cos, tan, log, exp, sqrt, etc.)
+  - [x] Verify: Scientific functions work with test values
 - [ ] Step 4: Implement memory functions (M+, M-, MR, MC)
   - [ ] Verify: Memory operations work correctly
 - [ ] Step 5: Implement history feature
