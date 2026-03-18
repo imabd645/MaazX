@@ -8,6 +8,8 @@ const sendBtn = document.getElementById('send-btn');
 const statusDot = document.getElementById('status-dot');
 
 let isProcessing = false;
+let currentAbortController = null;
+let currentReader = null;
 
 /* ── Markdown setup ─────────────────────────────────────── */
 marked.setOptions({
@@ -274,12 +276,21 @@ async function sendMessage() {
     if (!text || isProcessing) return;
 
     isProcessing = true;
-    sendBtn.disabled = true;
+    sendBtn.disabled = false; // Keep enabled for stop functionality
     welcome.classList.add('hidden');
 
     appendMessage('user', text);
     input.value = '';
     input.style.height = 'auto';
+
+    // Transform send button into stop button
+    sendBtn.classList.add('stop-mode');
+    sendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    sendBtn.title = 'Stop response';
+    sendBtn.onclick = stopResponse;
+
+    // Create AbortController for this request
+    currentAbortController = new AbortController();
 
     // Create the assistant message container early for streaming (includes thinking dots)
     const messageObj = appendStreamingMessage('assistant');
@@ -291,13 +302,14 @@ async function sendMessage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: text }),
+            signal: currentAbortController.signal,
         });
 
-        const reader = response.body.getReader();
+        currentReader = response.body.getReader();
         const decoder = new TextDecoder();
 
         while (true) {
-            const { value, done } = await reader.read();
+            const { value, done } = await currentReader.read();
             if (done) break;
 
             const chunk = decoder.decode(value, { stream: true });
@@ -330,13 +342,44 @@ async function sendMessage() {
             }
         }
     } catch (err) {
-        updateStreamingMessage(messageObj, 'Network error: ' + err.message);
+        if (err.name === 'AbortError') {
+            // User clicked stop — show partial response
+            if (!fullText) {
+                hideThinkingDots(messageObj);
+                updateStreamingMessage(messageObj, '*[Response stopped by user]*');
+            }
+        } else {
+            updateStreamingMessage(messageObj, 'Network error: ' + err.message);
+        }
     }
 
+    // Restore send button
+    restoreSendButton();
     setStatus('ready');
     isProcessing = false;
-    sendBtn.disabled = false;
+    currentAbortController = null;
+    currentReader = null;
     input.focus();
+}
+
+function stopResponse() {
+    // Signal backend to stop generating
+    fetch('/api/chat/abort', { method: 'POST' }).catch(() => { });
+    // Abort the frontend fetch
+    if (currentAbortController) {
+        currentAbortController.abort();
+    }
+    if (currentReader) {
+        try { currentReader.cancel(); } catch (e) { }
+    }
+}
+
+function restoreSendButton() {
+    sendBtn.classList.remove('stop-mode');
+    sendBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+    sendBtn.title = 'Send message';
+    sendBtn.onclick = sendMessage;
+    sendBtn.disabled = false;
 }
 
 function appendStreamingMessage(role) {
@@ -531,6 +574,23 @@ const modalClose = document.getElementById('modal-close');
         dirInput.value = data.cwd;
         loadProjectFiles(); // Also load the right sidebar file tree
     } catch { /* ignore */ }
+})();
+
+/* ── Restore chat session from DB on page load ──────────── */
+(async function restoreSession() {
+    try {
+        const res = await fetch('/api/session');
+        const data = await res.json();
+        if (data.messages && data.messages.length > 0) {
+            welcome.classList.add('hidden');
+            for (const msg of data.messages) {
+                const toolCalls = msg.tool_calls || [];
+                appendMessage(msg.role, msg.content, toolCalls);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to restore session:', err);
+    }
 })();
 
 /* Open modal */
