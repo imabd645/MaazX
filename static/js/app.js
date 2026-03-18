@@ -298,10 +298,13 @@ async function sendMessage() {
     let hasStartedText = false;
 
     try {
+        const modeSelector = document.getElementById('chat-mode-selector');
+        const selectedMode = modeSelector ? modeSelector.value : 'auto';
+
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text }),
+            body: JSON.stringify({ message: text, chat_mode: selectedMode }),
             signal: currentAbortController.signal,
         });
 

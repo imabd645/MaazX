@@ -755,7 +755,8 @@
                     style="padding: 15px; border-top: 1px solid var(--border); background: var(--bg-tertiary);">
                     <div class="input-wrapper">
                         <input type="file" id="chat-file-input" style="display:none" multiple>
-                        <button class="chat-upload-btn" id="chat-upload-btn" title="Upload to Knowledge Base">
+                        <button class="chat-upload-btn" id="chat-upload-btn" title="Upload to Knowledge Base"
+                            style="margin-right: 4px;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <path
@@ -763,6 +764,13 @@
                                 </path>
                             </svg>
                         </button>
+
+                        <select id="chat-mode-selector" class="chat-mode-selector" title="Agent Mode">
+                            <option value="auto">Auto</option>
+                            <option value="chat">Chat</option>
+                            <option value="action">Action</option>
+                        </select>
+
                         <textarea id="message-input" placeholder="Ask MaazX anything..." rows="1" autofocus></textarea>
                         <button class="send-btn" id="send-btn" title="Send message">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"

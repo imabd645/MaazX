@@ -86,14 +86,25 @@ def api_chat():
     
     data = request.get_json()
     user_msg = data.get("message", "").strip()
+    chat_mode = data.get("chat_mode", "auto")
     if not user_msg:
         return jsonify({"error": "Empty message"}), 400
 
     settings = db.load_settings()
     current_working_dir = settings.get("cwd", os.getcwd())
 
+    # ── Chat Mode Override ──
     from core.intent_classifier import classify_intent
-    intent = classify_intent(user_msg)
+    if chat_mode == "chat":
+        intent = "chat"  # Force tools off
+    elif chat_mode == "action":
+        intent = "task"  # Force tools on
+    else:
+        intent = classify_intent(user_msg) # Auto mode
+        
+    # ── Auto-Correction Learner (Background) ──
+    from core.correction_learner import extract_and_save_correction
+    threading.Thread(target=extract_and_save_correction, args=(user_msg, current_session_id), daemon=True).start()
     
     # Fetch memories for injection
     owner_name = settings.get("wa_owner_name", "User")
