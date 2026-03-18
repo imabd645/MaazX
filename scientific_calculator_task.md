@@ -5,8 +5,8 @@
 ## Checklist
 - [x] Step 1: Create main calculator.py file with GUI structure
   - [x] Verify: File exists and can be imported
-- [ ] Step 2: Implement basic arithmetic operations
-  - [ ] Verify: Calculator performs +, -, *, / correctly
+- [x] Step 2: Implement basic arithmetic operations
+  - [x] Verify: Calculator performs +, -, *, / correctly
 - [ ] Step 3: Implement scientific functions (sin, cos, tan, log, exp, sqrt, etc.)
   - [ ] Verify: Scientific functions work with test values
 - [ ] Step 4: Implement memory functions (M+, M-, MR, MC)
