@@ -1038,7 +1038,7 @@ body.light-theme ::-webkit-scrollbar-thumb {
     font-family: var(--font-mono);
     font-size: 12.5px;
     line-height: 1.6;
-    color: #c5c8c6;
+    color: var(--text-primary);
     white-space: pre-wrap;
     word-break: break-all;
 }
@@ -1058,11 +1058,11 @@ body.light-theme ::-webkit-scrollbar-thumb {
 }
 
 .term-cmd-text {
-    color: #e6edf3;
+    color: var(--text-primary);
 }
 
 .term-out {
-    color: #c5c8c6;
+    color: var(--text-secondary);
     padding-left: 4px;
 }
 
@@ -1076,8 +1076,8 @@ body.light-theme ::-webkit-scrollbar-thumb {
     align-items: center;
     gap: 6px;
     padding: 6px 14px 10px;
-    border-top: 1px solid rgba(255, 255, 255, .05);
-    background: #0a0e14;
+    border-top: 1px solid var(--border);
+    background: var(--bg-tertiary);
 }
 
 .terminal-prompt {
@@ -1092,7 +1092,7 @@ body.light-theme ::-webkit-scrollbar-thumb {
     flex: 1;
     background: transparent;
     border: none;
-    color: #e6edf3;
+    color: var(--text-primary);
     font-family: var(--font-mono);
     font-size: 13px;
     outline: none;

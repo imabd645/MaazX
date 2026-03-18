@@ -37,9 +37,11 @@ class Agent:
         
         self.messages.append({"role": "user", "content": message})
         
+        import copy
+        messages_copy = copy.deepcopy(self.messages)
         try:
             result = chat_completion_with_tools(
-                messages=self.messages,
+                messages=messages_copy,
                 model_name=config.MODEL_NAME,
                 allow_tools=allow_tools
             )

@@ -33,8 +33,12 @@ def print_header():
     print(f"{BOLD}{CYAN}==================================================={RESET}")
     print(f"{YELLOW}Type 'exit' or 'quit' to close. Type '/clear' to clear console.{RESET}\n")
 
+import database
+
 def get_prompt():
-    cwd = os.getcwd()
+    settings = database.load_settings()
+    cwd = settings.get("cwd", os.getcwd())
+    
     basename = os.path.basename(cwd)
     if not basename:
         basename = cwd

@@ -349,7 +349,9 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             if schema_tools: payload["tools"] = schema_tools
             print(f"\n[DeepSeek] API Request (Model: {model_name})")
             resp = requests.post(DEEPSEEK_BASE_URL, headers=headers, json=payload, timeout=120)
-            if not resp.ok: resp.raise_for_status()
+            if not resp.ok: 
+                print(f"[DeepSeek 400 Error JSON]: {resp.text}")
+                resp.raise_for_status()
             message = resp.json().get("choices", [{}])[0].get("message", {})
         
         # 1. Did the model just reply with text?
@@ -365,6 +367,11 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             
         # 2. Model wants to use tools
         print(f"[{provider.upper()}] Requested {len(message.get('tool_calls', []))} tools.")
+        
+        # DeepSeek API strictly rejects content=None in tool call records
+        if message.get("content") is None:
+            message["content"] = ""
+            
         messages.append(message)
         
         tool_calls_req = message.get("tool_calls", [])
