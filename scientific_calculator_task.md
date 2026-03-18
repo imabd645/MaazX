@@ -9,8 +9,8 @@
   - [x] Verify: Calculator performs +, -, *, / correctly
 - [x] Step 3: Implement scientific functions (sin, cos, tan, log, exp, sqrt, etc.)
   - [x] Verify: Scientific functions work with test values
-- [ ] Step 4: Implement memory functions (M+, M-, MR, MC)
-  - [ ] Verify: Memory operations work correctly
+- [x] Step 4: Implement memory functions (M+, M-, MR, MC)
+  - [x] Verify: Memory operations work correctly
 - [ ] Step 5: Implement history feature
   - [ ] Verify: History displays previous calculations
 - [ ] Step 6: Add keyboard support
