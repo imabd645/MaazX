@@ -39,12 +39,26 @@ genai_key = app_settings.get("gemini_api_key") or config.GEMINI_API_KEY
 if genai_key:
     genai.configure(api_key=genai_key)
 
-# Session tracking
-current_session_id = str(uuid.uuid4())[:8]
+# Session tracking — persist across restarts
+current_session_id = app_settings.get("current_session_id", str(uuid.uuid4())[:8])
+if "current_session_id" not in app_settings:
+    app_settings["current_session_id"] = current_session_id
+    db.save_settings({"current_session_id": current_session_id})
 current_working_dir = app_settings.get("cwd", os.getcwd())
 
-# In-memory message history for DeepSeek/OpenRouter
-session_messages = []
+# Restore in-memory message history from DB so LLM has context after restart
+def _restore_session_messages(session_id):
+    """Rebuild session_messages list from saved chat history."""
+    rows = db.get_chat_history(session_id, limit=50)
+    msgs = []
+    for row in rows:
+        msgs.append({"role": row["role"], "content": row["content"]})
+    return msgs
+
+session_messages = _restore_session_messages(current_session_id)
+
+# Abort flag for stopping SSE streaming mid-response
+_abort_chat = threading.Event()
 
 def _is_openrouter_model(model_name: str) -> bool:
     return model_name in openrouter_client.OPENROUTER_MODELS
@@ -62,6 +76,7 @@ def index():
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     global session_messages
+    _abort_chat.clear()  # Reset abort flag at start of each request
     data = request.get_json()
     user_msg = data.get("message", "").strip()
     if not user_msg:
@@ -111,6 +126,12 @@ def api_chat():
             )
 
             for chunk in stream_gen:
+                # Check if user requested abort
+                if _abort_chat.is_set():
+                    yield f"data: {json.dumps({'t': 'text', 'c': '\n\n*[Response stopped by user]*'})}\n\n"
+                    full_reply_text += "\n\n*[Response stopped by user]*"
+                    break
+
                 if chunk["t"] == "text":
                     full_reply_text += chunk["c"]
                 elif chunk["t"] == "tool":
@@ -142,6 +163,20 @@ def api_chat():
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
+@app.route("/api/chat/abort", methods=["POST"])
+def api_chat_abort():
+    """Signal the SSE generator to stop streaming."""
+    _abort_chat.set()
+    return jsonify({"status": "abort_requested"})
+
+
+@app.route("/api/session", methods=["GET"])
+def api_get_session():
+    """Return the current session ID and its saved chat messages for restoring on page load."""
+    messages = db.get_chat_history(current_session_id, limit=200)
+    return jsonify({"session_id": current_session_id, "messages": messages})
+
+
 # ── Files & Folders ──────────────────────────────────────────
 
 
@@ -150,6 +185,8 @@ def api_reset():
     global current_session_id, session_messages
     current_session_id = str(uuid.uuid4())[:8]
     session_messages = []
+    # Persist new session ID so it survives restarts
+    db.save_settings({"current_session_id": current_session_id})
     return jsonify({"status": "ok", "session": current_session_id})
 
 
