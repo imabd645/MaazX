@@ -860,6 +860,23 @@ termInput.addEventListener('keydown', (e) => {
 });
 
 async function runTerminalCommand(cmd) {
+    if (cmd === 'whoami') {
+        appendTermEntry(cmd, 'MaazX - Autonomous Engineering Partner', 0);
+        return;
+    }
+    if (cmd === 'creator') {
+        appendTermEntry(cmd, 'Abdullah Masood (UET Lahore)', 0);
+        return;
+    }
+    if (cmd === 'purpose') {
+        appendTermEntry(cmd, 'Bridge AI intelligence with real-world engineering', 0);
+        return;
+    }
+    if (cmd === 'status') {
+        appendTermEntry(cmd, '● Ready to collaborate', 0);
+        return;
+    }
+
     // Show command in output
     appendTermEntry(cmd, 'Running...', 0, true);
 
@@ -910,7 +927,7 @@ function appendTermEntry(cmd, output, exitCode, isLoading = false) {
     const outClass = isLoading ? 'term-out' : (exitCode === 0 ? 'term-out' : 'term-err');
     div.innerHTML = `
         <div class="term-cmd">
-            <span class="term-cmd-prompt">&gt;</span>
+            <span class="term-cmd-prompt" style="color:var(--green); font-weight:bold;">maazx@terminal:~$</span>
             <span class="term-cmd-text">${escapeHtml(cmd)}</span>
         </div>
         <div class="${outClass}">${escapeHtml(output)}</div>
