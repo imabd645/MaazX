@@ -41,7 +41,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'welcome'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'welcome', 'terminal-panel'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -50,15 +50,21 @@ function switchSidebarTab(active) {
 if (document.getElementById('btn-chat')) {
     document.getElementById('btn-chat').addEventListener('click', () => {
         switchSidebarTab('btn-chat');
-        // Chat button just shows the welcome screen in the center
-        document.getElementById('welcome').style.display = 'flex';
+        // Only show welcome if the chat area has no messages
+        const messagesDiv = document.getElementById('messages');
+        if (messagesDiv && messagesDiv.children.length === 0) {
+            document.getElementById('welcome').style.display = 'flex';
+        }
     });
 }
 
 if (document.getElementById('btn-tools')) {
     document.getElementById('btn-tools').addEventListener('click', () => {
         switchSidebarTab('btn-tools');
-        document.getElementById('welcome').style.display = 'flex';
+        const messagesDiv = document.getElementById('messages');
+        if (messagesDiv && messagesDiv.children.length === 0) {
+            document.getElementById('welcome').style.display = 'flex';
+        }
     });
 }
 
@@ -120,6 +126,28 @@ if (document.getElementById('btn-knowledge')) {
 if (document.getElementById('btn-tools')) {
     document.getElementById('btn-tools').addEventListener('click', () => switchSidebarTab('btn-tools'));
 }
+
+/* Close Panels (Back to Chat) */
+document.querySelectorAll('.btn-close-panel').forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Hide all center pane areas and terminal
+        ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'terminal-panel'].forEach(id => {
+            let el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        // Show welcome screen
+        const welcome = document.getElementById('welcome');
+        if (welcome) welcome.style.display = 'flex';
+
+        // Remove active state from sidebar navigation buttons 
+        document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+        // Focus chat input
+        const chatInput = document.getElementById('message-input');
+        if (chatInput) chatInput.focus();
+    });
+});
 
 /* Theme Toggle */
 const btnThemeToggle = document.getElementById('btn-theme-toggle');
@@ -184,12 +212,15 @@ if (document.getElementById('btn-new-chat')) {
 
 /* Sidebar Navigation Pane Manager */
 function showCenterPane(paneId) {
-    const panes = ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'knowledge-area'];
+    const panes = ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'knowledge-area', 'health-area', 'history-area', 'gmail-area'];
     panes.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = (id === paneId) ? 'flex' : 'none';
     });
-    document.getElementById('welcome').style.display = 'none';
+
+    // Hide welcome screen when showing a specific pane
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.style.display = 'none';
 }
 
 if (document.getElementById('btn-settings')) {
@@ -337,6 +368,14 @@ async function sendMessage() {
                             addToolBadge(messageObj, data.n, 'pending');
                         } else if (data.t === 'result') {
                             updateToolBadge(messageObj, data.n, 'success');
+
+                            // Auto-refresh right sidebar if the tool might have changed files or directories
+                            const fileModifyingTools = ['create_file', 'edit_file', 'patch_file', 'delete_file', 'run_command', 'write_to_file', 'move_file', 'copy_file'];
+                            if (fileModifyingTools.includes(data.n)) {
+                                if (typeof loadProjectFiles === 'function') {
+                                    setTimeout(() => loadProjectFiles(), 500); // Slight delay to ensure OS sync
+                                }
+                            }
                         }
                     } catch (e) {
                         console.error("Error parsing SSE chunk:", e);
