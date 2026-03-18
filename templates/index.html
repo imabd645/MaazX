@@ -14,7 +14,7 @@
     <link id="hljs-theme" rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2">
 </head>
 
 <body>
@@ -237,7 +237,17 @@
                 <div class="settings-area" id="settings-area"
                     style="display:none; padding:40px; overflow-y:auto; flex:1;">
                     <div class="welcome" style="max-width:800px; margin:0 auto; display:block;">
-                        <h1>System <span style="color:var(--accent)">Settings</span></h1>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h1>System <span style="color:var(--accent)">Settings</span></h1>
+                            <button class="quick-btn btn-close-panel" style="border-color:var(--border);">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                                    <polyline points="12 19 5 12 12 5"></polyline>
+                                </svg>
+                                Back to Chat
+                            </button>
+                        </div>
                         <p>Configure agent behavior, directory scanning, and LLM providers.</p>
                         <hr style="border-top:1px solid var(--border); margin: 30px 0;">
 
@@ -450,10 +460,20 @@
                     <div class="welcome" style="max-width:800px; margin:0 auto; display:block;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <h1><span style="color:var(--green)">WhatsApp</span> MaazX Core</h1>
-                            <button id="wa-logout-btn" class="quick-btn"
-                                style="border-color:var(--orange); color:var(--orange);">
-                                Logout Session
-                            </button>
+                            <div style="display:flex; gap:10px;">
+                                <button class="quick-btn btn-close-panel" style="border-color:var(--border);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                                        <polyline points="12 19 5 12 12 5"></polyline>
+                                    </svg>
+                                    Back to Chat
+                                </button>
+                                <button id="wa-logout-btn" class="quick-btn"
+                                    style="border-color:var(--orange); color:var(--orange);">
+                                    Logout Session
+                                </button>
+                            </div>
                         </div>
                         <p>Manage your linked WhatsApp account and customize AI behavior for specific contacts.</p>
                         <hr style="border-top:1px solid var(--border); margin: 30px 0;">
@@ -519,10 +539,20 @@
                     <div class="welcome" style="max-width:800px; margin:0 auto; display:block;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <h1><span style="color:var(--accent)">Scheduled</span> Tasks</h1>
-                            <button id="jobs-refresh-btn" class="quick-btn"
-                                style="border-color:var(--accent); color:var(--accent);">
-                                Refresh List
-                            </button>
+                            <div style="display:flex; gap:10px;">
+                                <button class="quick-btn btn-close-panel" style="border-color:var(--border);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                                        <polyline points="12 19 5 12 12 5"></polyline>
+                                    </svg>
+                                    Back to Chat
+                                </button>
+                                <button id="jobs-refresh-btn" class="quick-btn"
+                                    style="border-color:var(--accent); color:var(--accent);">
+                                    Refresh List
+                                </button>
+                            </div>
                         </div>
                         <p>Manage autonomous background jobs that run on a cron schedule.</p>
                         <hr style="border-top:1px solid var(--border); margin: 30px 0;">
@@ -541,10 +571,20 @@
                     <div class="welcome" style="max-width:800px; margin:0 auto; display:block;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <h1><span style="color:var(--accent)">Knowledge</span> Base</h1>
-                            <button id="kb-upload-btn" class="quick-btn"
-                                style="background:var(--accent); color:white; border:none; padding: 8px 16px;">
-                                + Upload Document
-                            </button>
+                            <div style="display:flex; gap:10px;">
+                                <button class="quick-btn btn-close-panel" style="border-color:var(--border);">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                                        <polyline points="12 19 5 12 12 5"></polyline>
+                                    </svg>
+                                    Back to Chat
+                                </button>
+                                <button id="kb-upload-btn" class="quick-btn"
+                                    style="background:var(--accent); color:white; border:none; padding: 8px 16px;">
+                                    + Upload Document
+                                </button>
+                            </div>
                             <input type="file" id="kb-file-input" style="display:none" accept=".pdf,.docx,.txt,.md,.csv"
                                 multiple>
                         </div>
@@ -813,7 +853,7 @@
 
     <!-- End Main Split -->
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=2"></script>
 </body>
 
 </html>
