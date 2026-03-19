@@ -5,8 +5,8 @@ import json
 # Compile regexes for performance
 # Secrets catching combinations of key words and high entropy strings or known prefixes
 SECRET_PATTERNS = [
-    (re.compile(r'(?i)(api[_-]?key|secret[_-]?key|password|token|access[_-]?token)\s*[:=]\s*[\'"][A-Za-z0-9_\-]{16,}[\'"]'), "High-entropy secret assignment"),
-    (re.compile(r'(?i)(ghp_[A-Za-z0-9]{36}|sk-[a-zA-Z0-9]{48}|sk-ant-[a-zA-Z0-9_\-]{40,})'), "Known provider token (GitHub, OpenAI, Anthropic)"),
+    (re.compile(r'(?i)(api[_-]?key|secret[_-]?key|password|token|access[_-]?token)\s*[:=]\s*[\'"]?[A-Za-z0-9_\-]{16,}[\'"]?'), "High-entropy secret assignment"),
+    (re.compile(r'(?i)(ghp_[A-Za-z0-9]{36}|github_pat_[a-zA-Z0-9_]{82}|sk-[a-zA-Z0-9]{32,}|sk-ant-[a-zA-Z0-9_\-]{40,})'), "Known provider token (GitHub, OpenAI, DeepSeek, Anthropic)"),
     (re.compile(r'(?i)bearer\s+[A-Za-z0-9\-\._~\+\/]+=*'), "Bearer token string"),
 ]
 
