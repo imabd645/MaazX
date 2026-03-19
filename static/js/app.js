@@ -28,7 +28,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail', 'btn-db'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail', 'btn-db', 'btn-git'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -41,7 +41,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'db-area', 'welcome', 'terminal-panel'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'db-area', 'git-area', 'welcome', 'terminal-panel'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -104,6 +104,15 @@ if (document.getElementById('btn-db')) {
         switchSidebarTab('btn-db');
         document.getElementById('db-area').style.display = 'flex';
         typeof loadDatabases === 'function' && loadDatabases();
+    });
+}
+
+if (document.getElementById('btn-git')) {
+    document.getElementById('btn-git').addEventListener('click', () => {
+        switchSidebarTab('btn-git');
+        document.getElementById('git-area').style.display = 'flex';
+        loadGitStatus();
+        loadGitLog();
     });
 }
 
@@ -2272,4 +2281,125 @@ if (dbSelector) {
             document.getElementById('db-query-btn').style.display = 'none';
         }
     });
+}
+
+/* ══════════════════════════════════════════════════════════
+   GIT / SOURCE CONTROL PANEL
+   ══════════════════════════════════════════════════════════ */
+
+async function loadGitStatus() {
+    try {
+        const res = await fetch('/api/git/status');
+        const data = await res.json();
+        const branchName = document.getElementById('git-branch-name');
+        const syncStatus = document.getElementById('git-sync-status');
+        const noRepo = document.getElementById('git-no-repo');
+        const changesSection = document.getElementById('git-changes-section');
+        const commitSection = document.getElementById('git-commit-section');
+        const filesList = document.getElementById('git-files-list');
+        const changeCount = document.getElementById('git-change-count');
+
+        if (!data.is_repo) {
+            branchName.textContent = 'No Repository';
+            syncStatus.textContent = '';
+            noRepo.style.display = 'block';
+            changesSection.style.display = 'none';
+            commitSection.style.display = 'none';
+            return;
+        }
+
+        noRepo.style.display = 'none';
+        changesSection.style.display = 'block';
+        commitSection.style.display = 'block';
+        branchName.textContent = data.branch;
+
+        let syncParts = [];
+        if (data.ahead > 0) syncParts.push(`↑${data.ahead}`);
+        if (data.behind > 0) syncParts.push(`↓${data.behind}`);
+        syncStatus.textContent = syncParts.length ? syncParts.join(' ') : '✓ In sync';
+
+        changeCount.textContent = `(${data.changed_count})`;
+
+        if (data.changed_files.length === 0) {
+            filesList.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:13px;">✓ Working tree clean</div>';
+            return;
+        }
+
+        const statusColors = { 'modified': 'var(--orange)', 'added': 'var(--green)', 'deleted': 'var(--red)', 'untracked': 'var(--text-muted)', 'renamed': 'var(--blue)' };
+        const statusLetters = { 'modified': 'M', 'added': 'A', 'deleted': 'D', 'untracked': '?', 'renamed': 'R' };
+
+        filesList.innerHTML = data.changed_files.map(f => `
+            <div class="git-file-item">
+                <span class="git-file-badge" style="color:${statusColors[f.label] || 'var(--text-muted)'}; border-color:${statusColors[f.label] || 'var(--border)'};">
+                    ${statusLetters[f.label] || f.status}
+                </span>
+                <span class="git-file-name">${escapeHtml(f.file)}</span>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Git status error:', err);
+    }
+}
+
+async function loadGitLog() {
+    try {
+        const res = await fetch('/api/git/log');
+        const data = await res.json();
+        const logList = document.getElementById('git-log-list');
+        if (!data.commits || data.commits.length === 0) {
+            logList.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:13px;">No commits yet</div>';
+            return;
+        }
+        logList.innerHTML = data.commits.map(c => `
+            <div class="git-commit-item">
+                <span class="git-commit-hash">${escapeHtml(c.hash)}</span>
+                <span class="git-commit-msg">${escapeHtml(c.message)}</span>
+                <span class="git-commit-meta">${escapeHtml(c.author)} • ${escapeHtml(c.date)}</span>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Git log error:', err);
+    }
+}
+
+async function gitAction(url, body) {
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {})
+        });
+        const data = await res.json();
+        if (data.error) {
+            alert('Git Error: ' + data.error);
+        } else {
+            loadGitStatus();
+            loadGitLog();
+        }
+        return data;
+    } catch (err) {
+        alert('Network error: ' + err.message);
+    }
+}
+
+if (document.getElementById('git-commit-btn')) {
+    document.getElementById('git-commit-btn').addEventListener('click', async () => {
+        const msgEl = document.getElementById('git-commit-msg');
+        const message = msgEl.value.trim();
+        if (!message) { alert('Please write a commit message.'); msgEl.focus(); return; }
+        const result = await gitAction('/api/git/commit', { message });
+        if (result && result.success) msgEl.value = '';
+    });
+}
+
+if (document.getElementById('git-push-btn')) {
+    document.getElementById('git-push-btn').addEventListener('click', () => gitAction('/api/git/push'));
+}
+
+if (document.getElementById('git-pull-btn')) {
+    document.getElementById('git-pull-btn').addEventListener('click', () => gitAction('/api/git/pull'));
+}
+
+if (document.getElementById('git-refresh-btn')) {
+    document.getElementById('git-refresh-btn').addEventListener('click', () => { loadGitStatus(); loadGitLog(); });
 }

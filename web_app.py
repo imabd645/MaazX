@@ -668,6 +668,119 @@ def api_undo_action():
     result = git_backup.undo_last_agent_action(current_working_dir)
     return jsonify(result)
 
+
+# ── Git Panel API ───────────────────────────────────────────
+@app.route("/api/git/status", methods=["GET"])
+def api_git_status():
+    """Returns branch name, changed files, and ahead/behind counts."""
+    try:
+        res = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                             cwd=current_working_dir, capture_output=True, text=True)
+        if res.returncode != 0:
+            return jsonify({"is_repo": False})
+
+        branch_res = subprocess.run(["git", "branch", "--show-current"],
+                                    cwd=current_working_dir, capture_output=True, text=True)
+        branch = branch_res.stdout.strip() or "HEAD (detached)"
+
+        status_res = subprocess.run(["git", "status", "--porcelain"],
+                                    cwd=current_working_dir, capture_output=True, text=True,
+                                    encoding='utf-8', errors='replace')
+        changed_files = []
+        for line in status_res.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            status_code = line[:2].strip()
+            filepath = line[3:].strip()
+            label = "modified"
+            if "?" in status_code: label = "untracked"
+            elif "A" in status_code: label = "added"
+            elif "D" in status_code: label = "deleted"
+            elif "R" in status_code: label = "renamed"
+            changed_files.append({"file": filepath, "status": status_code, "label": label})
+
+        ahead, behind = 0, 0
+        try:
+            ab_res = subprocess.run(["git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
+                                    cwd=current_working_dir, capture_output=True, text=True)
+            if ab_res.returncode == 0:
+                parts = ab_res.stdout.strip().split()
+                if len(parts) == 2:
+                    ahead, behind = int(parts[0]), int(parts[1])
+        except Exception:
+            pass
+
+        return jsonify({"is_repo": True, "branch": branch, "changed_files": changed_files,
+                        "changed_count": len(changed_files), "ahead": ahead, "behind": behind})
+    except Exception as e:
+        return jsonify({"is_repo": False, "error": str(e)})
+
+
+@app.route("/api/git/commit", methods=["POST"])
+def api_git_commit():
+    data = request.get_json()
+    message = data.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "Commit message is required"}), 400
+    try:
+        subprocess.run(["git", "add", "."], cwd=current_working_dir, capture_output=True, check=True)
+        result = subprocess.run(["git", "commit", "-m", message], cwd=current_working_dir,
+                                capture_output=True, text=True, encoding='utf-8', errors='replace')
+        if result.returncode != 0:
+            return jsonify({"error": result.stderr.strip() or result.stdout.strip()}), 400
+        return jsonify({"success": True, "output": result.stdout.strip()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/git/push", methods=["POST"])
+def api_git_push():
+    try:
+        result = subprocess.run(["git", "push"], cwd=current_working_dir, capture_output=True,
+                                text=True, encoding='utf-8', errors='replace', timeout=30)
+        output = (result.stdout or "") + (result.stderr or "")
+        if result.returncode != 0:
+            return jsonify({"error": output.strip()}), 400
+        return jsonify({"success": True, "output": output.strip() or "Push successful"})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Push timed out after 30s"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/git/pull", methods=["POST"])
+def api_git_pull():
+    try:
+        result = subprocess.run(["git", "pull"], cwd=current_working_dir, capture_output=True,
+                                text=True, encoding='utf-8', errors='replace', timeout=30)
+        output = (result.stdout or "") + (result.stderr or "")
+        if result.returncode != 0:
+            return jsonify({"error": output.strip()}), 400
+        return jsonify({"success": True, "output": output.strip() or "Pull successful"})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Pull timed out after 30s"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/git/log", methods=["GET"])
+def api_git_log():
+    try:
+        result = subprocess.run(["git", "log", "--oneline", "--format=%H|%s|%an|%ar", "-n", "10"],
+                                cwd=current_working_dir, capture_output=True, text=True,
+                                encoding='utf-8', errors='replace')
+        if result.returncode != 0:
+            return jsonify({"commits": []})
+        commits = []
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip(): continue
+            parts = line.split("|", 3)
+            if len(parts) == 4:
+                commits.append({"hash": parts[0][:7], "message": parts[1], "author": parts[2], "date": parts[3]})
+        return jsonify({"commits": commits})
+    except Exception as e:
+        return jsonify({"commits": [], "error": str(e)})
+
 # ── Health & System ─────────────────────────────────────────
 @app.route("/api/health", methods=["GET"])
 def api_get_health():
