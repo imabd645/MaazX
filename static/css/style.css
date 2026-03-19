@@ -1908,3 +1908,39 @@ body.light-theme ::-webkit-scrollbar-thumb {
     border-radius: 9px;
     border: 1px solid var(--border);
 }
+
+/* ── Auto-Heal Terminal ────────────────────────────────── */
+.auto-heal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    margin-top: 6px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--orange);
+    background: rgba(210, 153, 34, 0.1);
+    border: 1px solid rgba(210, 153, 34, 0.3);
+    animation: healPulse 1.5s ease-in-out infinite;
+}
+
+.auto-heal-badge.success {
+    color: var(--green);
+    background: rgba(46, 160, 67, 0.1);
+    border-color: rgba(46, 160, 67, 0.3);
+    animation: none;
+}
+
+@keyframes healPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}

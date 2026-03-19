@@ -905,6 +905,15 @@ async function runTerminalCommand(cmd) {
             cwdPathEl.textContent = data.cwd;
         }
 
+        // ── Auto-Heal Detection ──
+        if (data.exit_code !== 0) {
+            const errorPatterns = ['Traceback', 'Error:', 'Exception', 'SyntaxError', 'TypeError', 'NameError', 'ImportError', 'ModuleNotFoundError', 'FileNotFoundError', 'ValueError', 'KeyError', 'AttributeError', 'IndentationError'];
+            const hasError = errorPatterns.some(p => data.output.includes(p));
+            if (hasError) {
+                triggerAutoHeal(cmd, data.output, data.exit_code);
+            }
+        }
+
     } catch (err) {
         const entries = termOutput.querySelectorAll('.term-entry');
         const lastEntry = entries[entries.length - 1];
@@ -919,6 +928,85 @@ async function runTerminalCommand(cmd) {
 
     scrollTerminal();
     termInput.focus();
+}
+
+/* ── Auto-Heal Engine ── */
+async function triggerAutoHeal(command, output, exitCode) {
+    // Show pulsing badge in terminal
+    const healBadge = document.createElement('div');
+    healBadge.className = 'auto-heal-badge';
+    healBadge.innerHTML = '🔧 MaazX Auto-Healing...';
+    termOutput.appendChild(healBadge);
+    scrollTerminal();
+
+    // Also show a message in chat panel
+    const messageObj = appendStreamingMessage('assistant');
+    let fullText = '';
+    hideThinkingDots(messageObj);
+    updateStreamingMessage(messageObj, '*🔧 Auto-Healing terminal error...*\n\n');
+
+    try {
+        const response = await fetch('/api/terminal/auto_heal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command, output, exit_code: exitCode }),
+        });
+
+        // Check if auto-heal is disabled
+        if (response.headers.get('content-type')?.includes('application/json')) {
+            const jsonData = await response.json();
+            if (jsonData.status === 'disabled') {
+                healBadge.remove();
+                updateStreamingMessage(messageObj, '*Auto-heal is disabled in Settings.*');
+                return;
+            }
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.substring(6));
+                        if (data.t === 'text') {
+                            fullText += data.c;
+                            updateStreamingMessage(messageObj, '*🔧 Auto-Healing terminal error...*\n\n' + fullText);
+                        } else if (data.t === 'tool') {
+                            addToolBadge(messageObj, data.n, 'pending');
+                        } else if (data.t === 'result') {
+                            updateToolBadge(messageObj, data.n, 'success');
+                            // Refresh file explorer if files were changed
+                            const fileTools = ['create_file', 'edit_file', 'patch_file', 'delete_file', 'run_command'];
+                            if (fileTools.includes(data.n) && typeof loadProjectFiles === 'function') {
+                                setTimeout(() => loadProjectFiles(), 500);
+                            }
+                        }
+                    } catch (e) { /* skip malformed SSE */ }
+                }
+            }
+        }
+
+        // Update badge to success
+        healBadge.className = 'auto-heal-badge success';
+        healBadge.innerHTML = '✅ Auto-heal complete';
+
+    } catch (err) {
+        healBadge.className = 'auto-heal-badge';
+        healBadge.innerHTML = '❌ Auto-heal failed: ' + err.message;
+        healBadge.style.color = 'var(--red)';
+        healBadge.style.borderColor = 'rgba(248, 81, 73, 0.3)';
+        updateStreamingMessage(messageObj, '*Auto-heal error: ' + err.message + '*');
+    }
+
+    scrollTerminal();
 }
 
 function appendTermEntry(cmd, output, exitCode, isLoading = false) {
@@ -1000,6 +1088,9 @@ async function loadSettings() {
 
         const elWaReplyMode = document.getElementById('setting-wa-reply-mode');
         if (elWaReplyMode) elWaReplyMode.value = s.wa_reply_mode || 'all_contacts';
+
+        const elAutoHeal = document.getElementById('setting-auto-heal');
+        if (elAutoHeal) elAutoHeal.checked = s.auto_heal_enabled !== false;
     } catch { /* ignore */ }
 }
 
@@ -1022,6 +1113,7 @@ document.getElementById('setting-save').addEventListener('click', async () => {
         llm_provider: document.getElementById('setting-llm-provider')?.value || 'deepseek',
         llm_local_model: document.getElementById('setting-llm-local-model')?.value?.trim() || 'qwen3:8b',
         wa_reply_mode: document.getElementById('setting-wa-reply-mode')?.value || 'all_contacts',
+        auto_heal_enabled: document.getElementById('setting-auto-heal')?.checked !== false,
     };
 
     try {

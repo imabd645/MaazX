@@ -507,6 +507,73 @@ def api_terminal_history():
     return jsonify({"history": history, "cwd": current_working_dir})
 
 
+# ── Auto-Healing Terminal ───────────────────────────────────
+@app.route("/api/terminal/auto_heal", methods=["POST"])
+def api_terminal_auto_heal():
+    """
+    Receives a failed terminal command context and streams the AI's 
+    fix attempt back via SSE, reusing the main chat pipeline.
+    """
+    data = request.get_json()
+    command = data.get("command", "")
+    output = data.get("output", "")
+    exit_code = data.get("exit_code", 1)
+
+    # Check if auto-heal is enabled
+    settings = db.load_settings()
+    if not settings.get("auto_heal_enabled", True):
+        return jsonify({"status": "disabled"}), 200
+
+    # Build a focused prompt for the AI
+    heal_prompt = (
+        f"[AUTO-HEAL] A command just failed in the terminal. "
+        f"Analyze the error, identify the root cause, fix the code if possible, "
+        f"and explain what you did in one sentence.\n\n"
+        f"Failed Command: {command}\n"
+        f"Exit Code: {exit_code}\n"
+        f"Error Output:\n```\n{output}\n```\n\n"
+        f"Working Directory: {current_working_dir}\n"
+        f"IMPORTANT: Be concise. Fix the issue if it's a code bug. "
+        f"If it's a missing package, install it. If it's a typo in the command, suggest the correct one."
+    )
+
+    current_model = app_settings.get("model_name", config.MODEL_NAME)
+
+    def generate():
+        try:
+            messages = [
+                {"role": "system", "content": config.get_system_instruction()},
+                {"role": "user", "content": heal_prompt}
+            ]
+
+            owner_name = settings.get("wa_owner_name", "Admin")
+
+            stream_gen = deepseek_client.chat_completion_with_tools_stream(
+                messages=messages,
+                model_name=current_model,
+                allow_tools=True,
+                context_params={
+                    "user_id": owner_name,
+                    "is_admin": True
+                }
+            )
+
+            full_reply = ""
+            for chunk in stream_gen:
+                if chunk["t"] == "text":
+                    full_reply += chunk["c"]
+                yield f"data: {json.dumps(chunk)}\n\n"
+
+            # Save the auto-heal interaction to chat history
+            db.save_chat_message(current_session_id, "user", f"[Auto-Heal] Terminal error: `{command}`")
+            db.save_chat_message(current_session_id, "assistant", full_reply)
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
 # ── RAG / Indexing ──────────────────────────────────────────
 from core import indexer
 
