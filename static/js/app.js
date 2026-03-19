@@ -1588,6 +1588,33 @@ const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorApproveBtn = document.getElementById('editor-approve-btn');
 
 let currentActiveFilePath = null;
+let monacoEditorInstance = null;
+
+// Initialize Monaco Editor
+if (typeof require !== 'undefined') {
+    require(['vs/editor/editor.main'], function () {
+        const container = document.getElementById('monaco-editor-container');
+        if (container) {
+            monacoEditorInstance = monaco.editor.create(container, {
+                value: "",
+                language: "plaintext",
+                theme: "vs-dark",
+                automaticLayout: true,
+                minimap: { enabled: true },
+                fontSize: 14,
+                fontFamily: "var(--font-mono)"
+            });
+
+            // Bind Ctrl+S to save
+            monacoEditorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
+                if (editorSaveBtn && !editorSaveBtn.disabled && fileEditorArea.style.display !== 'none') {
+                    editorSaveBtn.click();
+                }
+            });
+        }
+    });
+}
+
 
 if (editorCloseBtn) {
     editorCloseBtn.addEventListener('click', () => {
@@ -1621,7 +1648,7 @@ if (editorSaveBtn) {
     editorSaveBtn.addEventListener('click', async () => {
         if (!currentActiveFilePath) return;
 
-        const content = editorTextarea.value;
+        const content = monacoEditorInstance ? monacoEditorInstance.getValue() : editorTextarea.value;
         const originalText = editorSaveBtn.textContent;
         editorSaveBtn.textContent = 'Saving...';
         editorSaveBtn.disabled = true;
@@ -1696,8 +1723,24 @@ async function openFileViewer(path) {
         }
 
         editorLoading.style.display = 'none';
-        editorTextarea.style.display = 'block';
-        editorTextarea.value = data.content;
+
+        if (monacoEditorInstance) {
+            // Determine language based on extension
+            const ext = path.split('.').pop().toLowerCase();
+            const langMap = {
+                'js': 'javascript', 'ts': 'typescript', 'py': 'python',
+                'html': 'html', 'css': 'css', 'json': 'json', 'md': 'markdown',
+                'yaml': 'yaml', 'yml': 'yaml', 'sh': 'shell'
+            };
+            const lang = langMap[ext] || 'plaintext';
+
+            monaco.editor.setModelLanguage(monacoEditorInstance.getModel(), lang);
+            monacoEditorInstance.setValue(data.content);
+            editorTextarea.style.display = 'none';
+        } else {
+            editorTextarea.style.display = 'block';
+            editorTextarea.value = data.content;
+        }
 
     } catch (err) {
         editorLoading.textContent = `Network Error: ${err.message}`;
