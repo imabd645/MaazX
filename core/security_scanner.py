@@ -15,7 +15,7 @@ SECRET_PATTERNS = [
 SQLI_PATTERNS = [
     (re.compile(r'(?i)(select|insert|update|delete|drop)\s+.*?(%s|%d|%f).*?%'), "Possible SQL injection via old-style string formatting"),
     (re.compile(r'(?i)(select|insert|update|delete|drop)\s+.*?\+'), "Possible SQL injection via string concatenation"),
-    (re.compile(r'f[\'"](?i)(select|insert|update|delete|drop).*?\{.*?\}'), "Possible SQL injection via f-string formatting"),
+    (re.compile(r'(?i)f[\'"](select|insert|update|delete|drop).*?\{.*?\}'), "Possible SQL injection via f-string formatting"),
 ]
 
 # Lightweight vulnerable dependencies check (examples, can be expanded)
