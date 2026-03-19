@@ -781,6 +781,17 @@ def api_git_log():
     except Exception as e:
         return jsonify({"commits": [], "error": str(e)})
 
+# ── Security Scanner API ────────────────────────────────────
+from core.security_scanner import scan_directory
+
+@app.route("/api/security/scan", methods=["GET"])
+def api_security_scan():
+    try:
+        findings = scan_directory(current_working_dir, limit_files=2000)
+        return jsonify({"success": True, "findings": findings})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 # ── Health & System ─────────────────────────────────────────
 @app.route("/api/health", methods=["GET"])
 def api_get_health():

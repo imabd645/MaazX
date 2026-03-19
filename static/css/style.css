@@ -2024,3 +2024,80 @@ body.light-theme ::-webkit-scrollbar-thumb {
     flex-shrink: 0;
     white-space: nowrap;
 }
+
+/* ── Security Scanner ─────────────────────────────────────────── */
+.sec-category {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.sec-finding-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    /* Color overridden by JS or category */
+    border-radius: 6px;
+    padding: 12px 16px;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+#sec-list-secrets .sec-finding-card {
+    border-left-color: var(--red);
+}
+
+#sec-list-sqli .sec-finding-card {
+    border-left-color: var(--orange);
+}
+
+#sec-list-deps .sec-finding-card {
+    border-left-color: var(--yellow);
+}
+
+.sec-finding-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.sec-finding-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.sec-finding-file {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+.sec-finding-line {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.sec-finding-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.sec-finding-snippet {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    white-space: pre;
+}

@@ -28,7 +28,7 @@ document.getElementById('toggle-sidebar').addEventListener('click', () => {
 });
 
 function switchSidebarTab(active) {
-    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail', 'btn-db', 'btn-git'];
+    let ids = ['btn-chat', 'btn-tools', 'btn-wa-view', 'btn-settings', 'btn-jobs', 'btn-health', 'btn-history', 'btn-knowledge', 'btn-gmail', 'btn-db', 'btn-git', 'btn-security'];
     ids.forEach(id => {
         let el = document.getElementById(id);
         if (el) el.classList.remove('active');
@@ -41,7 +41,7 @@ function switchSidebarTab(active) {
     if (toolsPanel) toolsPanel.style.display = active === 'btn-tools' ? 'block' : 'none';
 
     // Hide all center pane areas
-    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'db-area', 'git-area', 'welcome', 'terminal-panel'].forEach(id => {
+    ['settings-area', 'jobs-area', 'whatsapp-area', 'file-editor-area', 'health-area', 'history-area', 'knowledge-area', 'gmail-area', 'db-area', 'git-area', 'security-area', 'welcome', 'terminal-panel'].forEach(id => {
         let el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -115,6 +115,15 @@ if (document.getElementById('btn-git')) {
         loadGitLog();
     });
 }
+
+if (document.getElementById('btn-security')) {
+    document.getElementById('btn-security').addEventListener('click', () => {
+        switchSidebarTab('btn-security');
+        document.getElementById('security-area').style.display = 'flex';
+    });
+}
+
+
 
 if (document.getElementById('btn-history')) {
     document.getElementById('btn-history').addEventListener('click', () => {
@@ -2402,4 +2411,73 @@ if (document.getElementById('git-pull-btn')) {
 
 if (document.getElementById('git-refresh-btn')) {
     document.getElementById('git-refresh-btn').addEventListener('click', () => { loadGitStatus(); loadGitLog(); });
+}
+
+/* ══════════════════════════════════════════════════════════
+   SECURITY SCANNER
+   ══════════════════════════════════════════════════════════ */
+
+if (document.getElementById('sec-run-btn')) {
+    document.getElementById('sec-run-btn').addEventListener('click', runSecurityScan);
+}
+
+async function runSecurityScan() {
+    const loading = document.getElementById('sec-loading');
+    const resultsArea = document.getElementById('sec-results');
+    const btn = document.getElementById('sec-run-btn');
+
+    loading.style.display = 'block';
+    resultsArea.style.display = 'none';
+    btn.disabled = true;
+    btn.innerHTML = 'Scanning...';
+
+    try {
+        const res = await fetch('/api/security/scan');
+        const data = await res.json();
+
+        if (data.success && data.findings) {
+            renderSecurityFindings('sec-list-secrets', 'sec-count-secrets', data.findings.secrets, 'No exposed secrets found!', 'var(--green)');
+            renderSecurityFindings('sec-list-sqli', 'sec-count-sqli', data.findings.sqli, 'No SQL injection patterns found!', 'var(--green)');
+            renderSecurityFindings('sec-list-deps', 'sec-count-deps', data.findings.dependencies, 'No vulnerable dependencies found!', 'var(--green)');
+            resultsArea.style.display = 'block';
+        } else {
+            alert('Security scan failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Network error during security scan: ' + err.message);
+    } finally {
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20m10-10H2m15.5 7.1L6.5 4.9m11-14.2L6.5 19.1"></path></svg> Run Scan`;
+    }
+}
+
+function renderSecurityFindings(listId, countId, items, emptyMsg, emptyColor) {
+    const list = document.getElementById(listId);
+    const countBadge = document.getElementById(countId);
+
+    countBadge.textContent = items.length;
+    if (items.length === 0) {
+        countBadge.style.background = emptyColor;
+        countBadge.style.color = '#fff';
+        list.innerHTML = `<div style="padding:15px; text-align:center; color:var(--text-muted); font-size:13px; border:1px solid var(--border); border-radius:8px;">✅ ${emptyMsg}</div>`;
+        return;
+    }
+
+    // Reset color to default (handled via CSS classes or keep existing)
+    if (listId === 'sec-list-secrets') countBadge.style.background = 'var(--red)';
+    if (listId === 'sec-list-sqli') countBadge.style.background = 'var(--orange)';
+    if (listId === 'sec-list-deps') countBadge.style.background = 'var(--yellow)';
+    countBadge.style.color = (listId === 'sec-list-deps') ? '#000' : '#fff';
+
+    list.innerHTML = items.map(f => `
+        <div class="sec-finding-card">
+            <div class="sec-finding-header">
+                <span class="sec-finding-file">${escapeHtml(f.file)}</span>
+                <span class="sec-finding-line">Line ${f.line}</span>
+            </div>
+            <div class="sec-finding-desc">${escapeHtml(f.description)}</div>
+            <div class="sec-finding-snippet">${escapeHtml(f.snippet)}</div>
+        </div>
+    `).join('');
 }
