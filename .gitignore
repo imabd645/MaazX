@@ -73,3 +73,4 @@ test_whatsapp_privacy.py
 .chroma/9f077afa-370e-4a6a-9b2d-d08b0bef12f7/length.bin
 __pycache__/config.cpython-312.pyc
 media/screenshot_20260319_070955.png
+"media/" 
