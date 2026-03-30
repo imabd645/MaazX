@@ -84,6 +84,37 @@ body.light-theme {
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
 }
 
+body.light-theme {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #f3f4f6;
+    --bg-hover: #eaeef2;
+    --bg-active: #d0d7de;
+    --surface: #ffffff;
+    --border: #d0d7de;
+    --border-light: #c9d1d9;
+
+    --text-primary: #1f2328;
+    --text-secondary: #57606a;
+    --text-muted: #6e7781;
+
+    --accent: #7c3aed;
+    --accent-light: #8b5cf6;
+    --accent-glow: rgba(124, 58, 237, 0.15);
+    --accent-subtle: rgba(124, 58, 237, 0.1);
+
+    --green: #1a7f37;
+    --green-subtle: rgba(45, 164, 78, 0.15);
+    --blue: #0969da;
+    --blue-subtle: rgba(9, 105, 218, 0.15);
+    --orange: #bf8700;
+    --red: #cf222e;
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, .1);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, .15);
+    --shadow-lg: 0 8px 30px rgba(0, 0, 0, .5);
+}
+
 html,
 body {
     height: 100%;
