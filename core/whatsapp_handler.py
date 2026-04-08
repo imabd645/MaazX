@@ -91,6 +91,10 @@ def handle_incoming_message(msg_data: dict):
     contact_name = contact["name"] if contact and contact["name"] else "Unknown Contact"
     rules = contact["rules"] if contact and contact["rules"] else "Be helpful and conversational."
 
+    # Resolve per-contact tool whitelist
+    contact_tools_raw = contact.get("permitted_tools", "") if contact else ""
+    contact_permitted_tools = [t.strip() for t in contact_tools_raw.split(",") if t.strip()] if contact_tools_raw else None
+
     # ── Memory Summarization ──
     from core.memory_summarizer import summarize_if_needed
     summarize_if_needed("whatsapp", sender)
@@ -148,9 +152,8 @@ YOUR APPROACH:
 - Don't cite where you get your info—just provide it naturally.
 - Use PLAIN TEXT only. No markdown formatting.
 """
-        permitted_tools = ["search_web", "read_webpage"]
-        # Force intent to task if they ask a question that needs search? 
-        # Actually, allow_tools will be True below.
+        # Use per-contact whitelist if configured, else default to safe set
+        permitted_tools = contact_permitted_tools if contact_permitted_tools else ["search_web", "read_webpage"]
 
     reply_text = "I'm sorry, I encountered an error processing your message."
 

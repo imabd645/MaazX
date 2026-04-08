@@ -832,12 +832,32 @@ def api_restart_bridge():
     print("[System] Bridge restart requested via UI.")
     return jsonify({"success": True, "message": "Restart signal sent. Please check the bridge terminal."})
 
+@app.route("/api/tools/list", methods=["GET"])
+def api_list_tools():
+    """Return names of all registered agent tools (used by the contact editor UI)."""
+    tool_funcs = get_all_tools()
+    names = sorted(t.__name__ for t in tool_funcs)
+    return jsonify({"tools": names})
+
+
 # ── Chat History ────────────────────────────────────────────
 @app.route("/api/history", methods=["GET"])
 def api_list_history():
     """Return list of all unique chat sessions."""
     sessions = db.get_chat_sessions()
     return jsonify({"sessions": sessions})
+
+
+@app.route("/api/session/name", methods=["POST"])
+def api_set_session_name():
+    """Assign or update a human-readable name for a chat session."""
+    data = request.get_json() or {}
+    session_id = data.get("session_id", "").strip()
+    name = data.get("name", "").strip()
+    if not session_id or not name:
+        return jsonify({"error": "session_id and name are required"}), 400
+    db.set_session_name(session_id, name)
+    return jsonify({"success": True, "session_id": session_id, "name": name})
 
 @app.route("/api/history/<session_id>", methods=["GET"])
 def api_get_history_session(session_id):
@@ -950,7 +970,9 @@ def api_save_wa_contact():
         sanitized,
         data.get("name", "Unknown Contact"),
         data.get("summary", ""),
-        data.get("rules", "")
+        data.get("rules", ""),
+        1,
+        data.get("permitted_tools", "")
     )
     return jsonify({"success": True})
 

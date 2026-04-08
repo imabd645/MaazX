@@ -2101,3 +2101,63 @@ body.light-theme ::-webkit-scrollbar-thumb {
     overflow-x: auto;
     white-space: pre;
 }
+
+/* ── Tool Picker (WA Contact Editor) ────────────────────── */
+.tool-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background .12s;
+}
+
+.tool-picker-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tool-picker-item input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+}
+
+/* ── Session Rename Button (History Card) ───────────────── */
+.history-session-id {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.session-display-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 360px;
+}
+
+.rename-session-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    opacity: 0.5;
+    flex-shrink: 0;
+    transition: opacity .15s;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.rename-session-btn:hover {
+    opacity: 1;
+}

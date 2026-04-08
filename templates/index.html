@@ -545,6 +545,16 @@
                                         placeholder="System rules for this contact (e.g. Always reply warmly and concisely...)"
                                         style="height: 120px; resize: vertical; margin-bottom: 8px;"></textarea>
 
+                                    <div style="margin-bottom:8px;">
+                                        <label class="setting-label" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                            🔧 Allowed Tools
+                                            <span style="font-size:11px; color:var(--text-muted); font-weight:400;">(empty = default safe set)</span>
+                                        </label>
+                                        <div id="wa-tool-picker" style="max-height:130px; overflow-y:auto; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:5px;">
+                                            <span style="color:var(--text-muted); font-size:12px;">Loading tools…</span>
+                                        </div>
+                                    </div>
+
                                     <div style="display:flex; gap:10px;">
                                         <button class="setting-save-btn" id="wa-save-btn"
                                             style="flex:2; padding: 10px;">Save

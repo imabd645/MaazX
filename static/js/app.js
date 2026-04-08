@@ -1227,8 +1227,47 @@ const waRules = document.getElementById('wa-rules');
 const waSaveBtn = document.getElementById('wa-save-btn');
 
 let waContactsCache = [];
+let allToolNamesCache = [];
+
+// Fetch all registered tool names from the backend once
+async function loadAllToolNames() {
+    if (allToolNamesCache.length > 0) return;
+    try {
+        const res = await fetch('/api/tools/list');
+        const data = await res.json();
+        allToolNamesCache = data.tools || [];
+    } catch (e) {
+        console.error('Failed to load tool list:', e);
+    }
+}
+
+function renderToolPicker(selectedTools) {
+    const container = document.getElementById('wa-tool-picker');
+    if (!container) return;
+    const selectedSet = new Set(selectedTools);
+    container.innerHTML = '';
+    allToolNamesCache.forEach(tool => {
+        const label = document.createElement('label');
+        label.className = 'tool-picker-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = tool;
+        cb.checked = selectedSet.has(tool);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + tool));
+        container.appendChild(label);
+    });
+}
+
+function getSelectedTools() {
+    const container = document.getElementById('wa-tool-picker');
+    if (!container) return '';
+    const checked = Array.from(container.querySelectorAll('input[type=checkbox]:checked'));
+    return checked.map(cb => cb.value).join(',');
+}
 
 async function loadWaContacts() {
+    await loadAllToolNames();
     try {
         const res = await fetch('/api/whatsapp/contacts');
         waContactsCache = await res.json();
@@ -1257,6 +1296,7 @@ if (waSelect) {
             waPhone.readOnly = false;
             waSaveBtn.textContent = 'Add New Contact';
             if (waDeleteBtn) waDeleteBtn.style.display = 'none';
+            renderToolPicker([]);
         } else {
             const contact = waContactsCache[parseInt(val)];
             waPhone.value = contact.phone_number;
@@ -1265,6 +1305,8 @@ if (waSelect) {
             waPhone.readOnly = true; // Prevent changing phone number of existing edit
             waSaveBtn.textContent = 'Save Changes';
             if (waDeleteBtn) waDeleteBtn.style.display = 'block';
+            const existingTools = (contact.permitted_tools || '').split(',').filter(Boolean);
+            renderToolPicker(existingTools);
         }
     });
 
@@ -1297,7 +1339,8 @@ if (waSelect) {
         const payload = {
             phone_number: phone,
             name: waName.value.trim(),
-            rules: waRules.value.trim()
+            rules: waRules.value.trim(),
+            permitted_tools: getSelectedTools()
         };
 
         waSaveBtn.textContent = 'Saving...';
@@ -1996,11 +2039,15 @@ async function loadChatHistoryList() {
         container.innerHTML = '';
         data.sessions.forEach(session => {
             const date = new Date(session.last_ts * 1000).toLocaleString();
+            const displayName = session.name || ('Session: ' + session.session);
             const card = document.createElement('div');
             card.className = 'history-card';
             card.innerHTML = `
                 <div class="history-info">
-                    <div class="history-session-id">Session: ${session.session}</div>
+                    <div class="history-session-id" title="Session ID: ${session.session}">
+                        <span class="session-display-name">${escapeHtml(displayName)}</span>
+                        <button class="rename-session-btn" title="Rename session" data-sid="${escapeHtml(session.session)}" data-name="${escapeHtml(session.name || '')}">✏️</button>
+                    </div>
                     <div class="history-meta">
                         <span>${session.msg_count} messages</span>
                         <span>Last active: ${date}</span>
@@ -2030,6 +2077,35 @@ async function loadChatHistoryList() {
                     await deleteSession(session.session);
                 }
             });
+
+            // Wire up rename btn
+            const renameBtn = card.querySelector('.rename-session-btn');
+            if (renameBtn) {
+                renameBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const sid = renameBtn.dataset.sid;
+                    const currentName = renameBtn.dataset.name;
+                    const newName = prompt('Enter a name for this session:', currentName || '');
+                    if (newName === null || newName.trim() === '') return;
+                    try {
+                        const res = await fetch('/api/session/name', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session_id: sid, name: newName.trim() })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            const nameEl = card.querySelector('.session-display-name');
+                            if (nameEl) nameEl.textContent = newName.trim();
+                            renameBtn.dataset.name = newName.trim();
+                        } else {
+                            alert('Rename failed: ' + (data.error || 'unknown error'));
+                        }
+                    } catch (err) {
+                        alert('Network error: ' + err.message);
+                    }
+                });
+            }
 
             container.appendChild(card);
         });

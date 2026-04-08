@@ -46,11 +46,12 @@ def init_db():
         );
         
         CREATE TABLE IF NOT EXISTS whatsapp_contacts (
-            phone_number TEXT PRIMARY KEY,
-            name         TEXT,
-            summary      TEXT DEFAULT '',
-            rules        TEXT DEFAULT '',
-            auto_reply   INTEGER DEFAULT 1
+            phone_number    TEXT PRIMARY KEY,
+            name            TEXT,
+            summary         TEXT DEFAULT '',
+            rules           TEXT DEFAULT '',
+            auto_reply      INTEGER DEFAULT 1,
+            permitted_tools TEXT DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS whatsapp_messages (
@@ -71,7 +72,18 @@ def init_db():
             value   TEXT NOT NULL,
             UNIQUE(user_id, key)
         );
+
+        CREATE TABLE IF NOT EXISTS session_names (
+            session TEXT PRIMARY KEY,
+            name    TEXT NOT NULL
+        );
     """)
+    # Migrate existing DB: add permitted_tools column if absent
+    try:
+        conn.execute("ALTER TABLE whatsapp_contacts ADD COLUMN permitted_tools TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
@@ -188,17 +200,40 @@ def save_chat_message(session: str, role: str, content: str, tool_calls: list = 
 
 
 def get_chat_sessions():
-    """Return list of unique sessions with their latest timestamp."""
+    """Return list of unique sessions with their latest timestamp and optional name."""
     conn = _get_conn()
     rows = conn.execute("""
-        SELECT session, MAX(timestamp) as last_ts, COUNT(*) as msg_count
-        FROM chat_history
-        GROUP BY session
+        SELECT ch.session,
+               MAX(ch.timestamp) as last_ts,
+               COUNT(*) as msg_count,
+               sn.name as name
+        FROM chat_history ch
+        LEFT JOIN session_names sn ON ch.session = sn.session
+        GROUP BY ch.session
         ORDER BY last_ts DESC
         LIMIT 50
     """).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def set_session_name(session: str, name: str):
+    """Assign a human-readable name to a session."""
+    conn = _get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO session_names (session, name) VALUES (?, ?)",
+        (session, name.strip()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_session_name(session: str) -> str:
+    """Return the name of a session, or empty string if unnamed."""
+    conn = _get_conn()
+    row = conn.execute("SELECT name FROM session_names WHERE session = ?", (session,)).fetchone()
+    conn.close()
+    return row["name"] if row else ""
 
 
 def get_chat_history(session: str, limit: int = 100):
@@ -305,15 +340,17 @@ def get_wa_contact(phone_number: str) -> dict:
 
 def get_all_wa_contacts():
     conn = _get_conn()
-    rows = conn.execute("SELECT phone_number, name, summary, rules, auto_reply FROM whatsapp_contacts ORDER BY name ASC").fetchall()
+    rows = conn.execute(
+        "SELECT phone_number, name, summary, rules, auto_reply, permitted_tools FROM whatsapp_contacts ORDER BY name ASC"
+    ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def save_wa_contact(phone_number: str, name: str, summary: str = "", rules: str = "", auto_reply: int = 1):
+def save_wa_contact(phone_number: str, name: str, summary: str = "", rules: str = "", auto_reply: int = 1, permitted_tools: str = ""):
     conn = _get_conn()
     conn.execute(
-        "INSERT OR REPLACE INTO whatsapp_contacts (phone_number, name, summary, rules, auto_reply) VALUES (?, ?, ?, ?, ?)",
-        (phone_number, name, summary, rules, auto_reply)
+        "INSERT OR REPLACE INTO whatsapp_contacts (phone_number, name, summary, rules, auto_reply, permitted_tools) VALUES (?, ?, ?, ?, ?, ?)",
+        (phone_number, name, summary, rules, auto_reply, permitted_tools)
     )
     conn.commit()
     conn.close()
