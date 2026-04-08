@@ -66,3 +66,6 @@ import tools.vision_intelligence
 
 # LinkedIn Management
 import tools.linkedin_manager
+
+# PDF Generation
+import tools.pdf_generation
