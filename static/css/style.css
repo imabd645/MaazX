@@ -2161,3 +2161,42 @@ body.light-theme ::-webkit-scrollbar-thumb {
 .rename-session-btn:hover {
     opacity: 1;
 }
+
+/* ── Drag & Drop Overlay ───────────────── */
+.dropzone-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(18, 18, 18, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s, visibility 0.2s;
+}
+
+.dropzone-overlay.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+.dropzone-overlay .dropzone-content {
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    padding: 60px 80px;
+    text-align: center;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    pointer-events: none;
+    /* Let drops pass through to the overlay listener */
+}
+
+.dropzone-overlay .dropzone-content svg {
+    color: var(--accent);
+    margin-bottom: 16px;
+}

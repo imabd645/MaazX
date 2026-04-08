@@ -266,7 +266,7 @@ if (document.getElementById('btn-jobs')) {
 if (document.getElementById('btn-wa-view')) {
     document.getElementById('btn-wa-view').addEventListener('click', () => {
         showCenterPane('whatsapp-area');
-        loadWhatsAppContacts();
+        loadWaContacts();
     });
 }
 
@@ -2600,3 +2600,58 @@ function renderSecurityFindings(listId, countId, items, emptyMsg, emptyColor) {
         </div>
     `).join('');
 }
+
+/* ── File Drag & Drop Attachment ───────────────────────── */
+const dropOverlay = document.getElementById('dropzone-overlay');
+const msgInput = document.getElementById('message-input');
+let dragCounter = 0;
+
+window.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+        dragCounter++;
+        if (dropOverlay && dragCounter === 1) {
+            dropOverlay.classList.add('active');
+        }
+    }
+});
+
+window.addEventListener('dragover', (e) => {
+    e.preventDefault(); // allow drop
+});
+
+window.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+        dragCounter--;
+        if (dropOverlay && dragCounter === 0) {
+            dropOverlay.classList.remove('active');
+        }
+    }
+});
+
+window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    if (dropOverlay) dropOverlay.classList.remove('active');
+
+    if (e.dataTransfer && e.dataTransfer.files) {
+        const files = Array.from(e.dataTransfer.files);
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const text = event.target.result;
+                const extMatch = file.name.match(/\.([^.]+)$/);
+                const ext = extMatch ? extMatch[1] : '';
+                const markdownBlock = `\n\`\`\`${ext}\n// Attached File: ${file.name}\n${text}\n\`\`\`\n`;
+
+                if (msgInput) {
+                    const separator = msgInput.value.length > 0 && !msgInput.value.endsWith('\n') ? '\n' : '';
+                    msgInput.value = msgInput.value + separator + markdownBlock;
+                    msgInput.dispatchEvent(new Event('input', { bubbles: true })); // trigger auto-resize
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+});

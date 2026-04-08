@@ -546,11 +546,15 @@
                                         style="height: 120px; resize: vertical; margin-bottom: 8px;"></textarea>
 
                                     <div style="margin-bottom:8px;">
-                                        <label class="setting-label" style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                                        <label class="setting-label"
+                                            style="margin-bottom:6px; display:flex; align-items:center; gap:6px;">
                                             🔧 Allowed Tools
-                                            <span style="font-size:11px; color:var(--text-muted); font-weight:400;">(empty = default safe set)</span>
+                                            <span
+                                                style="font-size:11px; color:var(--text-muted); font-weight:400;">(empty
+                                                = default safe set)</span>
                                         </label>
-                                        <div id="wa-tool-picker" style="max-height:130px; overflow-y:auto; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:5px;">
+                                        <div id="wa-tool-picker"
+                                            style="max-height:130px; overflow-y:auto; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:5px;">
                                             <span style="color:var(--text-muted); font-size:12px;">Loading tools…</span>
                                         </div>
                                     </div>
@@ -1136,6 +1140,19 @@
             </div>
         </div>
     </main>
+
+    <!-- Drag and Drop Overlay -->
+    <div id="dropzone-overlay" class="dropzone-overlay">
+        <div class="dropzone-content">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <polyline points="9 15 12 12 15 15"></polyline>
+            </svg>
+            <h2>Drop file to attach as context</h2>
+        </div>
+    </div>
 
     <!-- Monaco Editor AMD Loader -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
