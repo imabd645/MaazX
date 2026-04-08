@@ -6,6 +6,7 @@ until a final conversational response is returned.
 
 import json
 import requests
+import concurrent.futures
 from typing import Dict, Any, List
 
 import config
@@ -38,6 +39,7 @@ def build_tool_definitions(whitelist: List[str] = None) -> List[Dict[str, Any]]:
         if not schema["function"]["parameters"]["required"]: del schema["function"]["parameters"]["required"]
         tools_list.append(schema)
     return tools_list
+
 def _call_ollama_llm(messages: List[Dict[str, Any]], model: str, tools: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Calls local Ollama API with chat completion.
@@ -64,6 +66,41 @@ def _call_ollama_llm(messages: List[Dict[str, Any]], model: str, tools: List[Dic
     except Exception as e:
         print(f"[Ollama Error] {e}")
         return {"role": "assistant", "content": f"Ollama Error: {str(e)}"}
+
+def _execute_single_tool(tc: Dict[str, Any], context_params: Dict[str, Any]) -> tuple:
+    """Helper to execute a single tool. Returns (call_id, fn_name, fn_args, result_str)."""
+    fn = tc.get("function", {})
+    fn_name = fn.get("name", "")
+    call_id = tc.get("id", "")
+    
+    try:
+        fn_args = fn.get("arguments", "{}")
+        if isinstance(fn_args, str):
+            if not fn_args.strip():
+                fn_args = "{}"
+            fn_args = json.loads(fn_args)
+    except Exception:
+        fn_args = {}
+        
+    tool_func = get_tool_by_name(fn_name)
+    if tool_func:
+        try:
+            import inspect
+            sig = inspect.signature(tool_func)
+            final_args = fn_args.copy()
+            if context_params:
+                if "user_id" in sig.parameters and "user_id" not in final_args:
+                    final_args["user_id"] = context_params.get("user_id", "global")
+                if "is_admin" in sig.parameters and "is_admin" not in final_args:
+                    final_args["is_admin"] = context_params.get("is_admin", False)
+            result = tool_func(**final_args)
+            result_str = str(result)
+        except Exception as e:
+            result_str = f"Error executing {fn_name}: {str(e)}"
+    else:
+        result_str = f"Error: Tool '{fn_name}' not found."
+        
+    return call_id, fn_name, fn_args, result_str
 
 def chat_completion_with_tools_stream(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None, context_params: Dict[str, Any] = None):
     """
@@ -254,49 +291,52 @@ def chat_completion_with_tools_stream(messages: List[Dict[str, Any]], model_name
             messages.append(message)
             return
 
-        # Model wants to use tools
+        # Model wants to use tools - execute in parallel
         messages.append(message)
-        for tc in message.get("tool_calls", []):
+        tool_calls_list = message.get("tool_calls", [])
+        
+        # 1. Immediately yield start events for all tools so UI updates fast
+        for tc in tool_calls_list:
             fn = tc.get("function", {})
             fn_name = fn.get("name", "")
-            call_id = tc.get("id", "")
-            
             try:
                 fn_args = tc.get("function", {}).get("arguments", "{}")
                 if isinstance(fn_args, str):
+                    if not fn_args.strip(): fn_args = "{}"
                     fn_args = json.loads(fn_args)
             except Exception:
                 fn_args = {}
-            
             yield {"t": "tool", "n": fn_name, "a": fn_args}
             executed_tools_log.append({"name": fn_name, "args": fn_args})
             
-            # Execute locally
-            tool_func = get_tool_by_name(fn_name)
-            if tool_func:
+        # 2. Execute parallelly
+        results_by_id = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(tool_calls_list))) as executor:
+            future_to_tc = {executor.submit(_execute_single_tool, tc, context_params): tc for tc in tool_calls_list}
+            for future in concurrent.futures.as_completed(future_to_tc):
+                tc = future_to_tc[future]
                 try:
-                    import inspect
-                    sig = inspect.signature(tool_func)
-                    final_args = fn_args.copy()
-                    if context_params:
-                        if "user_id" in sig.parameters and "user_id" not in final_args:
-                            final_args["user_id"] = context_params.get("user_id", "global")
-                        if "is_admin" in sig.parameters and "is_admin" not in final_args:
-                            final_args["is_admin"] = context_params.get("is_admin", False)
-                    result = tool_func(**final_args)
-                    result_str = str(result)
-                except Exception as e:
-                    result_str = f"Error executing {fn_name}: {str(e)}"
-            else:
-                result_str = f"Error: Tool '{fn_name}' not found."
-            
-            yield {"t": "result", "n": fn_name, "r": result_str}
+                    call_id, fn_name, fn_args, result_str = future.result()
+                    results_by_id[call_id] = result_str
+                    # 3. Yield completion event as soon as one thread ends
+                    yield {"t": "result", "n": fn_name, "r": result_str}
+                except Exception as exc:
+                    call_id = tc.get("id", "unknown")
+                    fn_name = tc.get("function", {}).get("name", "unknown")
+                    results_by_id[call_id] = f"Error executing {fn_name}: {exc}"
+                    yield {"t": "result", "n": fn_name, "r": results_by_id[call_id]}
+                    
+        # 4. Append tool results to message history in the original requested order
+        for tc in tool_calls_list:
+            call_id = tc.get("id", "")
+            fn_name = tc.get("function", {}).get("name", "")
+            result_str = results_by_id.get(call_id, f"Error: Tool lost.")
             messages.append({"role": "tool", "tool_call_id": call_id, "name": fn_name, "content": result_str})
 
 def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str = "deepseek-chat", allow_tools: bool = True, permitted_tools: List[str] = None, context_params: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Sends a completion request to the configured LLM provider (DeepSeek or Ollama).
-    Executes tool calls locally and returns the final response.
+    Executes tool calls locally (in parallel) and returns the final response.
     """
     import database
     settings = database.load_settings()
@@ -304,14 +344,12 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
     provider = settings.get("llm_provider", "deepseek")
     local_model = settings.get("llm_local_model", "qwen2.5-coder:7b")
     
-    # Extract context params from messages if present (sent by handlers)
     if not context_params:
         context_params = {}
 
     schema_tools = build_tool_definitions(whitelist=permitted_tools) if allow_tools else []
     executed_tools_log = []
 
-    # Loop allows up to 20 sequential tool calls to prevent infinite loops
     for _ in range(20):
         if provider == "ollama":
             message = _call_ollama_llm(messages, local_model, schema_tools)
@@ -366,53 +404,35 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
             }
             
         # 2. Model wants to use tools
-        print(f"[{provider.upper()}] Requested {len(message.get('tool_calls', []))} tools.")
+        tool_calls_req = message.get("tool_calls", [])
+        print(f"[{provider.upper()}] Requested {len(tool_calls_req)} tools.")
         
-        # DeepSeek API strictly rejects content=None in tool call records
         if message.get("content") is None:
             message["content"] = ""
             
         messages.append(message)
         
-        tool_calls_req = message.get("tool_calls", [])
-        
-        for tc in tool_calls_req:
-            fn = tc.get("function", {})
-            fn_name = fn.get("name", "")
-            call_id = tc.get("id", "")
-            
-            try:
-                fn_args = tc.get("function", {}).get("arguments", "{}")
-                if isinstance(fn_args, str):
-                    fn_args = json.loads(fn_args)
-            except Exception:
-                fn_args = {}
-                
-            executed_tools_log.append({"name": fn_name, "args": fn_args})
-            
-            # Execute locally
-            tool_func = get_tool_by_name(fn_name)
-            if tool_func:
+        # Parallel execution
+        results_by_id = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(tool_calls_req))) as executor:
+            futures_to_tc = {executor.submit(_execute_single_tool, tc, context_params): tc for tc in tool_calls_req}
+            for future in concurrent.futures.as_completed(futures_to_tc):
+                tc = futures_to_tc[future]
                 try:
-                    # Context Injection Logic
-                    import inspect
-                    sig = inspect.signature(tool_func)
-                    final_args = fn_args.copy()
-                    
-                    if context_params:
-                        if "user_id" in sig.parameters and "user_id" not in final_args:
-                            final_args["user_id"] = context_params.get("user_id", "global")
-                        if "is_admin" in sig.parameters and "is_admin" not in final_args:
-                            final_args["is_admin"] = context_params.get("is_admin", False)
+                    call_id, fn_name, fn_args, result_str = future.result()
+                    results_by_id[call_id] = result_str
+                    executed_tools_log.append({"name": fn_name, "args": fn_args})
+                except Exception as exc:
+                    call_id = tc.get("id", "unknown")
+                    fn_name = tc.get("function", {}).get("name", "unknown")
+                    results_by_id[call_id] = f"Error executing {fn_name}: {exc}"
+                    executed_tools_log.append({"name": fn_name, "args": {}})
 
-                    result = tool_func(**final_args)
-                    result_str = str(result)
-                except Exception as e:
-                    result_str = f"Error executing {fn_name}: {str(e)}"
-            else:
-                result_str = f"Error: Tool '{fn_name}' not found."
-                
-            # Append the tool's result to history
+        # Append the tool's result to history in original order
+        for tc in tool_calls_req:
+            call_id = tc.get("id", "")
+            fn_name = tc.get("function", {}).get("name", "")
+            result_str = results_by_id.get(call_id, "Error: Tool execution failed.")
             messages.append({
                 "role": "tool",
                 "tool_call_id": call_id,
@@ -420,7 +440,6 @@ def chat_completion_with_tools(messages: List[Dict[str, Any]], model_name: str =
                 "content": result_str
             })
             
-    # Fallback if loop hit 10 iterations
     return {
         "reply": "System Error: Model called tools too many times in a row.",
         "executed_tools": executed_tools_log
