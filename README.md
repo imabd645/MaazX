@@ -5,6 +5,8 @@
 Unlike traditional chat interfaces, MaazX is an **active participant** in your development cycle. It doesn't just suggest code; it reads your filesystem, interprets logic patterns, executes PowerShell commands, manages your Git state, and communicates results through encrypted WhatsApp and Gmail channels. This document serves as the absolute authority on its internal architecture, tool capabilities, and operational protocols.
 
 ---
+# Note
+**All the credentials and the secret files are mock or sample credentials or files for easy setup**
 
 ## 🏛 1. Core Architecture & Engineering Philosophy
 
