@@ -75,3 +75,18 @@ agent_secrets.env
 
 # Test scripts
 test_*.py
+# databases
+*.db
+*.db-shm
+*.db-wal
+
+# secrets
+*.env
+credentials.json
+
+# logs/output
+out.txt
+
+# python
+__pycache__/
+*.pyc
